@@ -1,0 +1,6 @@
+{
+  "name": "Agent HQ",
+  "description": "Interactive 2D virtual AI office simulation where autonomous agents collaborate, move, execute missions, and communicate in real time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

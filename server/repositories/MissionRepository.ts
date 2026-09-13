@@ -36,7 +36,7 @@ export class MissionRepository {
   public create(mission: Omit<MissionEntity, 'completed_nodes'> & { completed_nodes?: number }): MissionEntity {
     this.db
       .prepare(`
-        INSERT INTO missions (id, title, description, status, total_nodes, completed_nodes, summary, error, started_at, completed_at)
+        INSERT OR REPLACE INTO missions (id, title, description, status, total_nodes, completed_nodes, summary, error, started_at, completed_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(

@@ -295,6 +295,46 @@ export class AgentSpriteRenderer {
       ctx.textBaseline = 'middle';
       ctx.fillText('⚡', 10, badgeY + 6);
       ctx.restore();
+    } else if (status === 'TOOL_EXECUTION') {
+      // Animated wrench / tool execution badge
+      ctx.save();
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.95)';
+      ctx.beginPath();
+      ctx.arc(0, badgeY + 2, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🛠️', 0, badgeY + 2);
+      ctx.restore();
+    } else if (status === 'WAITING_APPROVAL') {
+      // Pulsing purple authorization shield
+      ctx.save();
+      const pulse = Math.sin(animTime / 150) * 1.5;
+      ctx.fillStyle = 'rgba(168, 85, 247, 0.95)';
+      ctx.beginPath();
+      ctx.arc(0, badgeY + 2, 8 + pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🛡️', 0, badgeY + 2);
+      ctx.restore();
+    } else if (status === 'WAITING') {
+      // Waiting / paused state
+      ctx.save();
+      ctx.fillStyle = 'rgba(100, 116, 139, 0.9)';
+      ctx.beginPath();
+      ctx.arc(0, badgeY + 2, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('⏳', 0, badgeY + 2);
+      ctx.restore();
     } else if (status === 'COMPLETED') {
       // Golden star / checkmark
       ctx.save();

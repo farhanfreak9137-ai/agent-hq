@@ -72,19 +72,36 @@ export class TaskRepository {
 
   public create(task: Omit<TaskEntity, 'created_at'>): TaskEntity {
     const now = Date.now();
+
+    let assignedAgentId = task.assigned_agent_id || null;
+    if (assignedAgentId) {
+      const agentExists = this.db.prepare('SELECT id FROM agents WHERE id = ?').get(assignedAgentId);
+      if (!agentExists) {
+        assignedAgentId = null;
+      }
+    }
+
+    let missionId = task.mission_id || null;
+    if (missionId) {
+      const missionExists = this.db.prepare('SELECT id FROM missions WHERE id = ?').get(missionId);
+      if (!missionExists) {
+        missionId = null;
+      }
+    }
+
     this.db
       .prepare(`
-        INSERT INTO tasks (id, mission_id, title, description, priority, status, assigned_agent_id, provider_id, execution_mode, attempts, max_attempts, result, error, created_at, started_at, completed_at)
+        INSERT OR REPLACE INTO tasks (id, mission_id, title, description, priority, status, assigned_agent_id, provider_id, execution_mode, attempts, max_attempts, result, error, created_at, started_at, completed_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         task.id,
-        task.mission_id || null,
+        missionId,
         task.title,
         task.description,
         task.priority || 'MEDIUM',
         task.status || 'PENDING',
-        task.assigned_agent_id || null,
+        assignedAgentId,
         task.provider_id || 'mock',
         task.execution_mode || 'mock',
         task.attempts || 0,

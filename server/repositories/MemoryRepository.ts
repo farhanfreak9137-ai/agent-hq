@@ -15,7 +15,23 @@ export interface MemoryEntity {
 export class MemoryRepository {
   constructor(private db: Database.Database) {}
 
+  private ensureAgentExists(agentId: string): void {
+    const existing = this.db.prepare('SELECT id FROM agents WHERE id = ?').get(agentId);
+    if (!existing) {
+      try {
+        this.db.prepare(`
+          INSERT OR IGNORE INTO agents (id, name, role, status, capabilities, memory_retention_limit)
+          VALUES (?, ?, 'Coder', 'IDLE', '["coding"]', 100)
+        `).run(agentId, agentId);
+      } catch {
+        // Ignore duplicate insertion races
+      }
+    }
+  }
+
   public save(entry: MemoryEntity, maxRetention: number = 100): MemoryEntity {
+    this.ensureAgentExists(entry.agent_id);
+
     this.db
       .prepare(`
         INSERT INTO memory_entries (id, agent_id, task_id, session_id, type, content, metadata, timestamp, expires_at)

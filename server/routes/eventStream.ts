@@ -63,4 +63,15 @@ export class EventStreamManager {
   public getConnectedCount(): number {
     return this.clients.size;
   }
+
+  public destroy(): void {
+    for (const [id, client] of this.clients.entries()) {
+      try {
+        client.res.end();
+      } catch {
+        // Ignore socket errors during termination
+      }
+    }
+    this.clients.clear();
+  }
 }

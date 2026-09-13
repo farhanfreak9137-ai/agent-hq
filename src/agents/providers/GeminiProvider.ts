@@ -70,6 +70,7 @@ export class GeminiAgentRuntime implements AgentRuntime {
           title: task.title,
           description: task.description,
           capabilities: this.capabilities,
+          providerId: 'gemini',
         }),
         signal: context?.abortSignal,
       });
@@ -82,6 +83,7 @@ export class GeminiAgentRuntime implements AgentRuntime {
       const result = await response.json();
       this.status = 'COMPLETED';
       const durationMs = Date.now() - startTime;
+      const executionMode = result.executionMode === 'real' ? 'real' : 'mock';
 
       const executionResult: TaskExecutionResult = {
         taskId: task.id,
@@ -91,15 +93,15 @@ export class GeminiAgentRuntime implements AgentRuntime {
         output: result.output || '',
         durationMs,
         toolsUsed: result.toolsUsed || ['gemini_reasoning'],
-        executionMode: 'real',
+        executionMode,
       };
 
-      Logger.taskCompleted(task.id, this.agentId, task.title, 'gemini', 'real', durationMs);
+      Logger.taskCompleted(task.id, this.agentId, task.title, 'gemini', executionMode, durationMs);
 
       this.memory.remember({
         type: 'task_completed',
         content: executionResult.summary || 'Task completed via Gemini',
-        metadata: { taskId: task.id },
+        metadata: { taskId: task.id, executionMode },
       });
 
       EventBus.emit({
@@ -109,7 +111,7 @@ export class GeminiAgentRuntime implements AgentRuntime {
         agentId: this.agentId,
         taskId: task.id,
         result: executionResult,
-        message: `${this.agentModel.name} successfully executed task via Gemini [REAL].`,
+        message: `${this.agentModel.name} executed task via Gemini [${executionMode.toUpperCase()}].`,
       });
 
       return executionResult;

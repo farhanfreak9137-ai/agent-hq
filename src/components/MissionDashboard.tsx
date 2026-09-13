@@ -24,6 +24,9 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({ isOpen, onCl
   );
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<string>('software_development');
+  const [showCustomModal, setShowCustomModal] = useState<boolean>(false);
+  const [customGoal, setCustomGoal] = useState<string>('');
+  const [customDesc, setCustomDesc] = useState<string>('');
 
   const telemetryService = TelemetryService.getInstance();
   const [metrics, setMetrics] = useState(telemetryService.getSystemMetrics());
@@ -80,9 +83,85 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({ isOpen, onCl
     BossOrchestrator.getInstance().runCompetingEvaluation();
   };
 
+  const handleLaunchCustom = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customGoal.trim()) return;
+    BossOrchestrator.getInstance().launchCustomMission(customGoal.trim(), customDesc.trim() || undefined);
+    setShowCustomModal(false);
+    setCustomGoal('');
+    setCustomDesc('');
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 select-none">
-      <div className="flex flex-col w-full max-w-6xl h-[90vh] bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="flex flex-col w-full max-w-6xl h-[90vh] bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden relative">
+        {/* Custom Initiative Modal */}
+        {showCustomModal && (
+          <div className="absolute inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-6">
+            <form
+              onSubmit={handleLaunchCustom}
+              className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 text-xs"
+            >
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 font-bold">✨</span>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">BOSS Custom Mission Planner</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCustomModal(false)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Mission Objective / Goal</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Audit Cryptographic Tokens & Hardened Session Storage"
+                  value={customGoal}
+                  onChange={(e) => setCustomGoal(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Scope Details & Deliverable Requirements</label>
+                <textarea
+                  rows={3}
+                  placeholder="Describe constraints, domain scope, and key deliverables for multi-agent DAG decomposition..."
+                  value={customDesc}
+                  onChange={(e) => setCustomDesc(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-lg text-slate-400 text-[11px] leading-relaxed">
+                <span className="text-cyan-400 font-semibold">Autonomous Decomposition:</span> BOSS will automatically break down this objective into a 5-phase DAG (Scoping → Research → Implementation → Security Verification → Peer Review → Executive Synthesis) with capability-matched agents.
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomModal(false)}
+                  className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow transition"
+                >
+                  Decompose & Launch DAG
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-slate-950 border-b border-slate-800">
           <div className="flex items-center gap-3">
@@ -129,6 +208,12 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({ isOpen, onCl
               className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium shadow transition-all flex items-center gap-1.5"
             >
               <span>⚖️</span> Competing Solutions
+            </button>
+            <button
+              onClick={() => setShowCustomModal(true)}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow transition-all flex items-center gap-1.5"
+            >
+              <span>✨</span> Custom Initiative
             </button>
           </div>
 

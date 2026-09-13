@@ -104,4 +104,30 @@ export const server = app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`[Agent HQ Server] Production backend listening on http://127.0.0.1:${PORT}`);
 });
 
+// 9. Graceful Shutdown
+const gracefulShutdown = (signal: string) => {
+  console.log(`\n[Agent HQ Server] Received ${signal}. Initiating graceful shutdown...`);
+  eventStream.destroy();
+  server.close(() => {
+    console.log('[Agent HQ Server] HTTP server closed.');
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      db.close();
+      console.log('[Agent HQ Server] SQLite database closed cleanly.');
+    } catch (e) {
+      console.error('[Agent HQ Server] Error closing database:', e);
+    }
+    process.exit(0);
+  });
+
+  // Force close if graceful termination hangs
+  setTimeout(() => {
+    console.error('[Agent HQ Server] Forced shutdown after timeout.');
+    process.exit(1);
+  }, 5000).unref();
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
 export default app;

@@ -375,6 +375,120 @@ export class TaskPlanner {
     return graph;
   }
 
+  /**
+   * Dynamically plans and decomposes a free-form mission goal into a multi-agent DAG.
+   */
+  public decomposeGoal(goal: string, description?: string): TaskGraph {
+    const graph = new TaskGraph(
+      generateId('graph'),
+      goal,
+      generateId('init')
+    );
+
+    // Root node: BOSS Strategy & Scope Definition
+    const rootId = 'node_scope_' + generateId('n');
+    graph.addNode({
+      id: rootId,
+      taskId: generateId('task'),
+      title: `Scope & Mission Decomposition: ${goal.substring(0, 36)}`,
+      description: `BOSS defines execution boundaries, risk parameters, and deliverables for: ${description || goal}`,
+      assignedAgentId: 'boss',
+      dependencies: [],
+      dependents: [],
+      status: 'pending',
+      retryCount: 0,
+      maxRetries: 1,
+    });
+
+    // Phase 1: Research / Requirements Analysis (ATLAS)
+    const researchId = 'node_research_' + generateId('n');
+    graph.addNode({
+      id: researchId,
+      taskId: generateId('task'),
+      title: `Domain & Requirements Analysis`,
+      description: `Analyze background, gather telemetry, and verify dependencies for "${goal}".`,
+      assignedAgentId: 'atlas',
+      dependencies: [rootId],
+      dependents: [],
+      status: 'pending',
+      retryCount: 0,
+      maxRetries: 2,
+    });
+
+    // Phase 2: Technical Implementation (NOVA)
+    const implId = 'node_impl_' + generateId('n');
+    graph.addNode({
+      id: implId,
+      taskId: generateId('task'),
+      title: `Core Technical Implementation`,
+      description: `Execute core engineering and structural changes for "${goal}".`,
+      assignedAgentId: 'nova',
+      dependencies: [researchId],
+      dependents: [],
+      status: 'pending',
+      retryCount: 0,
+      maxRetries: 2,
+    });
+
+    // Phase 3: Security & Verification Audit (SENTINEL)
+    const auditId = 'node_audit_' + generateId('n');
+    graph.addNode({
+      id: auditId,
+      taskId: generateId('task'),
+      title: `Security & Quality Verification`,
+      description: `Audit zero-trust compliance, error handling, and test bounds for "${goal}".`,
+      assignedAgentId: 'sentinel',
+      dependencies: [implId],
+      dependents: [],
+      status: 'pending',
+      retryCount: 0,
+      maxRetries: 2,
+    });
+
+    // Phase 4: Peer Review & Validation (ECHO)
+    const reviewId = 'node_review_' + generateId('n');
+    graph.addNode({
+      id: reviewId,
+      taskId: generateId('task'),
+      title: `Peer Review & Acceptance Benchmarking`,
+      description: `Rigorous peer review of deliverables, artifacts, and outputs.`,
+      assignedAgentId: 'echo',
+      dependencies: [auditId],
+      dependents: [],
+      status: 'pending',
+      retryCount: 0,
+      maxRetries: 1,
+    });
+
+    // Phase 5: BOSS Executive Synthesis
+    const synthId = 'node_synth_' + generateId('n');
+    graph.addNode({
+      id: synthId,
+      taskId: generateId('task'),
+      title: `Executive Synthesis & Deliverable Compilation`,
+      description: `BOSS synthesizes findings from all streams and compiles mission artifact.`,
+      assignedAgentId: 'boss',
+      dependencies: [reviewId],
+      dependents: [],
+      status: 'pending',
+      retryCount: 0,
+      maxRetries: 1,
+    });
+
+    graph.addEdge(rootId, researchId);
+    graph.addEdge(researchId, implId);
+    graph.addEdge(implId, auditId);
+    graph.addEdge(auditId, reviewId);
+    graph.addEdge(reviewId, synthId);
+
+    const validation = graph.validate();
+    if (!validation.valid) {
+      throw new Error(`Dynamic plan validation failed: ${validation.errors.join('; ')}`);
+    }
+
+    return graph;
+  }
+
   private recommendAgentForRole(role: AgentRole): string {
     return TaskPlanner.ROLE_AGENT_MAP[role] || 'boss';
   }

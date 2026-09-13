@@ -75,6 +75,19 @@ export class BossOrchestrator {
   }
 
   /**
+   * Decompose and launch any free-form objective through BOSS dynamic DAG planning.
+   */
+  public async launchCustomMission(goal: string, description?: string): Promise<InitiativeResult> {
+    const startTime = Date.now();
+    this.isOrchestrating = true;
+
+    const graph = this.planner.decomposeGoal(goal, description);
+    this.activeGraph = graph;
+
+    return this.runGraph(graph, goal, startTime);
+  }
+
+  /**
    * Run the architecture analysis smoke test as a verified single-task DAG.
    */
   public async runArchitectureAnalysis(targetAgentId: string = 'nova'): Promise<InitiativeResult> {

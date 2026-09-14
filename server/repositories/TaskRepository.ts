@@ -243,6 +243,13 @@ export class TaskRepository {
     }));
   }
 
+  public clearAll(): number {
+    this.db.prepare('DELETE FROM task_dependencies').run();
+    this.db.prepare('DELETE FROM task_executions').run();
+    const info = this.db.prepare('DELETE FROM tasks').run();
+    return info.changes;
+  }
+
   private mapRowToEntity(row: any): TaskEntity {
     return {
       id: row.id,

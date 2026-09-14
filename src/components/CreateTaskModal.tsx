@@ -4,6 +4,7 @@ import { AgentModel, TaskPriority } from '../types/index.ts';
 import { TaskManager } from '../tasks/TaskManager.ts';
 import { AgentManager } from '../agents/AgentManager.ts';
 import { SimulationEngine } from '../simulation/SimulationEngine.ts';
+import { BossOrchestrator } from '../orchestration/BossOrchestrator.ts';
 
 interface CreateTaskModalProps {
   agents: AgentModel[];
@@ -29,6 +30,15 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     e.preventDefault();
     if (!title.trim()) return;
 
+    // If assigned to BOSS, trigger the autonomous multi-agent decomposition & dispatch engine!
+    if (assignedAgentId === 'boss') {
+      BossOrchestrator.getInstance().launchCustomMission(title.trim(), description.trim() || undefined);
+      setTitle('');
+      setDescription('');
+      onClose();
+      return;
+    }
+
     const newTask = TaskManager.createTask({
       title: title.trim(),
       description: description.trim() || 'Autonomous agent initiative execution.',
@@ -47,6 +57,11 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         assignedAgentId,
         `New assignment: "${title.trim()}" with ${priority} priority.`
       );
+
+      // Automatically execute the task via the AgentManager runtime!
+      AgentManager.executeTask(assignedAgentId, newTask).catch((err) => {
+        console.warn('[CreateTaskModal] Direct task execution error:', err);
+      });
     }
 
     setTitle('');

@@ -297,6 +297,18 @@ class TaskManagerClass {
     this.save();
   }
 
+  public async clearAllTasks(): Promise<void> {
+    this.tasks.clear();
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem('agent_hq_tasks');
+      }
+      await fetch('/api/tasks', { method: 'DELETE' });
+    } catch (e) {
+      console.warn('[TaskManager] Error deleting server tasks:', e);
+    }
+  }
+
   private save(): void {
     try {
       localStorage.setItem('agent_hq_tasks', JSON.stringify(Array.from(this.tasks.values())));

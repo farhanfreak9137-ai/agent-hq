@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, CheckCircle2, Clock, PlayCircle, AlertCircle, ShieldAlert } from 'lucide-react';
+import { X, Plus, CheckCircle2, Clock, PlayCircle, AlertCircle, ShieldAlert, Trash2 } from 'lucide-react';
 import { AgentModel, TaskModel, TaskStatus } from '../types/index.ts';
 import { TaskManager } from '../tasks/TaskManager.ts';
 
@@ -21,6 +21,13 @@ export const TaskBoardModal: React.FC<TaskBoardModalProps> = ({
   onSelectAgentById,
 }) => {
   const [selectedTask, setSelectedTask] = useState<TaskModel | null>(null);
+
+  const handleClearAll = async () => {
+    if (window.confirm(`Clear all ${tasks.length} initiatives and test tasks from the pipeline?`)) {
+      await TaskManager.clearAllTasks();
+      onClose();
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -59,6 +66,16 @@ export const TaskBoardModal: React.FC<TaskBoardModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {tasks.length > 0 && (
+              <button
+                onClick={handleClearAll}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 border border-red-800/60 text-red-300 hover:text-white text-xs font-semibold shadow-sm transition"
+                title="Clear all tasks from the pipeline"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                <span>Clear Board</span>
+              </button>
+            )}
             <button
               onClick={onOpenCreateTask}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-sm transition"

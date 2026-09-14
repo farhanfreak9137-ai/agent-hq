@@ -43,17 +43,27 @@ export const authService = new AuthService(repos.users);
 export const eventStream = new EventStreamManager(repos.events);
 
 // 5. External Provider Setup
-const geminiApiKey = process.env.GEMINI_API_KEY || '';
-const hasGeminiKey = Boolean(geminiApiKey && geminiApiKey !== 'MY_GEMINI_API_KEY' && geminiApiKey.length > 5);
+const rawGeminiKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
+const geminiApiKeys: string[] = rawGeminiKeys
+  .split(',')
+  .map((k) => k.trim())
+  .filter((k) => Boolean(k && k !== 'MY_GEMINI_API_KEY' && k.length > 5));
 
-let aiClient: GoogleGenAI | null = null;
-if (hasGeminiKey) {
+const hasGeminiKey = geminiApiKeys.length > 0;
+const geminiClients: { client: GoogleGenAI; key: string }[] = [];
+for (const key of geminiApiKeys) {
   try {
-    aiClient = new GoogleGenAI({ apiKey: geminiApiKey });
+    geminiClients.push({ client: new GoogleGenAI({ apiKey: key }), key });
   } catch (err) {
-    console.warn('[Backend] Failed to initialize GoogleGenAI client:', err);
+    console.warn('[Backend] Failed to initialize GoogleGenAI client for key:', err);
   }
 }
+
+const aiClient = geminiClients[0]?.client || null;
+const groqApiKey = process.env.GROQ_API_KEY || '';
+const openaiApiKey = process.env.OPENAI_API_KEY || '';
+const groqModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const openaiModel = process.env.OPENAI_MODEL || 'gpt-4o';
 
 import { execSync } from 'child_process';
 
@@ -95,7 +105,9 @@ app.get('/api/health', (_req: Request, res: Response) => {
     connectedClients: eventStream.getConnectedCount(),
     providers: {
       mock: { available: true },
-      gemini: { available: hasGeminiKey },
+      gemini: { available: hasGeminiKey, keyCount: geminiClients.length },
+      groq: { available: Boolean(groqApiKey) },
+      openai: { available: Boolean(openaiApiKey) },
       antigravity: {
         available: agyStatus.available,
         version: agyStatus.version,
@@ -109,8 +121,9 @@ app.get('/api/health', (_req: Request, res: Response) => {
 app.get('/api/providers/gemini/health', (_req: Request, res: Response) => {
   res.json({
     available: hasGeminiKey,
+    keyCount: geminiClients.length,
     message: hasGeminiKey
-      ? 'Gemini backend operational'
+      ? `Gemini backend operational with ${geminiClients.length} key(s) in rotation pool`
       : 'GEMINI_API_KEY is not configured in server environment (.env).',
     latencyMs: hasGeminiKey ? 12 : 0,
   });
@@ -128,7 +141,13 @@ app.get('/api/providers/antigravity/health', (_req: Request, res: Response) => {
 });
 
 // 7. Mount Comprehensive API Router
-const apiRouter = createApiRouter(db, repos, authService, eventStream, aiClient, hasGeminiKey);
+const apiRouter = createApiRouter(db, repos, authService, eventStream, aiClient, hasGeminiKey, {
+  geminiClients,
+  groqApiKey,
+  openaiApiKey,
+  groqModel,
+  openaiModel,
+});
 app.use('/api', apiRouter);
 
 // 8. Error Handling Middleware

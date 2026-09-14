@@ -89,7 +89,7 @@ export class ProviderRouter {
     }
 
     if (providerId === 'antigravity') {
-      return 'antigravity-advanced-v2';
+      return 'gemini-3.8-flash-low';
     }
 
     return 'mock-model-v1';

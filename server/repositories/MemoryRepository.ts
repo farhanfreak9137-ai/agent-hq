@@ -32,6 +32,14 @@ export class MemoryRepository {
   public save(entry: MemoryEntity, maxRetention: number = 100): MemoryEntity {
     this.ensureAgentExists(entry.agent_id);
 
+    let taskId = entry.task_id || null;
+    if (taskId) {
+      const taskExists = this.db.prepare('SELECT id FROM tasks WHERE id = ?').get(taskId);
+      if (!taskExists) {
+        taskId = null;
+      }
+    }
+
     this.db
       .prepare(`
         INSERT INTO memory_entries (id, agent_id, task_id, session_id, type, content, metadata, timestamp, expires_at)
@@ -40,7 +48,7 @@ export class MemoryRepository {
       .run(
         entry.id,
         entry.agent_id,
-        entry.task_id || null,
+        taskId,
         entry.session_id || null,
         entry.type,
         entry.content,

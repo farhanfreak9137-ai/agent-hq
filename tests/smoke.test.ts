@@ -154,8 +154,10 @@ export async function testSmoke() {
 }
 
 if (process.argv[1]?.endsWith('smoke.test.ts')) {
-  testSmoke().catch((err) => {
-    console.error('[FAIL]', err);
-    process.exit(1);
-  });
+  testSmoke()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('[FAIL]', err);
+      process.exit(1);
+    });
 }

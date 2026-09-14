@@ -70,7 +70,7 @@ export class TaskRepository {
     return task;
   }
 
-  public create(task: Omit<TaskEntity, 'created_at'>): TaskEntity {
+  public create(task: Partial<Omit<TaskEntity, 'created_at'>> & { id: string; title: string }): TaskEntity {
     const now = Date.now();
 
     let assignedAgentId = task.assigned_agent_id || null;
@@ -89,37 +89,57 @@ export class TaskRepository {
       }
     }
 
+    const fullEntity: TaskEntity = {
+      id: task.id,
+      mission_id: missionId,
+      title: task.title,
+      description: task.description || '',
+      priority: task.priority || 'MEDIUM',
+      status: task.status || 'PENDING',
+      assigned_agent_id: assignedAgentId,
+      provider_id: task.provider_id || 'mock',
+      execution_mode: task.execution_mode || 'mock',
+      attempts: task.attempts || 0,
+      max_attempts: task.max_attempts || 3,
+      result: task.result || null,
+      error: task.error || null,
+      dependencies: task.dependencies || [],
+      created_at: now,
+      started_at: task.started_at || null,
+      completed_at: task.completed_at || null,
+    };
+
     this.db
       .prepare(`
         INSERT OR REPLACE INTO tasks (id, mission_id, title, description, priority, status, assigned_agent_id, provider_id, execution_mode, attempts, max_attempts, result, error, created_at, started_at, completed_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
-        task.id,
-        missionId,
-        task.title,
-        task.description,
-        task.priority || 'MEDIUM',
-        task.status || 'PENDING',
-        assignedAgentId,
-        task.provider_id || 'mock',
-        task.execution_mode || 'mock',
-        task.attempts || 0,
-        task.max_attempts || 3,
-        task.result ? JSON.stringify(task.result) : null,
-        task.error || null,
-        now,
-        task.started_at || null,
-        task.completed_at || null
+        fullEntity.id,
+        fullEntity.mission_id,
+        fullEntity.title,
+        fullEntity.description,
+        fullEntity.priority,
+        fullEntity.status,
+        fullEntity.assigned_agent_id,
+        fullEntity.provider_id,
+        fullEntity.execution_mode,
+        fullEntity.attempts,
+        fullEntity.max_attempts,
+        fullEntity.result ? JSON.stringify(fullEntity.result) : null,
+        fullEntity.error,
+        fullEntity.created_at,
+        fullEntity.started_at,
+        fullEntity.completed_at
       );
 
-    if (task.dependencies && task.dependencies.length > 0) {
-      for (const depId of task.dependencies) {
-        this.addDependency(task.id, depId);
+    if (fullEntity.dependencies && fullEntity.dependencies.length > 0) {
+      for (const depId of fullEntity.dependencies) {
+        this.addDependency(fullEntity.id, depId);
       }
     }
 
-    return { ...task, created_at: now };
+    return fullEntity;
   }
 
   public updateStatus(
@@ -188,16 +208,16 @@ export class TaskRepository {
         execution.task_id,
         execution.agent_id,
         execution.provider_id,
-        execution.execution_mode,
-        execution.attempt_number,
+        execution.execution_mode || 'mock',
+        execution.attempt_number || 1,
         execution.status,
         execution.started_at,
-        execution.completed_at,
-        execution.duration_ms,
-        execution.summary,
-        execution.output,
+        execution.completed_at ?? null,
+        execution.duration_ms ?? null,
+        execution.summary ?? null,
+        execution.output ?? null,
         JSON.stringify(execution.tools_used || []),
-        execution.error
+        execution.error ?? null
       );
   }
 

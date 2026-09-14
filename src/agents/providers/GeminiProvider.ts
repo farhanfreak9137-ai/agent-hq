@@ -114,6 +114,16 @@ export class GeminiAgentRuntime implements AgentRuntime {
         message: `${this.agentModel.name} executed task via Gemini [${executionMode.toUpperCase()}].`,
       });
 
+      EventBus.emit({
+        id: generateId('ev'),
+        type: 'task.completed',
+        timestamp: Date.now(),
+        taskId: task.id,
+        agentId: this.agentId,
+        result: executionResult,
+        message: `Task "${task.title}" completed successfully by ${this.agentModel.name}`,
+      });
+
       return executionResult;
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);

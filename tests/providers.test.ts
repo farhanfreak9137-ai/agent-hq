@@ -33,27 +33,41 @@ export async function testProviders() {
   }
   console.log('[PASS] Mock provider reports available');
 
-  // Test 3: Antigravity provider clean fallback/unconfigured report
+  // Test 3: Antigravity provider health report
   const agHealth = await registry.checkHealth('antigravity');
-  const statusStr = agHealth?.status as string;
-  if (!agHealth || (statusStr !== 'unavailable' && statusStr !== 'unconfigured')) {
-    throw new Error(`Expected antigravity provider to report unavailable or unconfigured, got: ${agHealth?.status}`);
+  if (!agHealth || (agHealth.status !== 'available' && agHealth.status !== 'unavailable')) {
+    throw new Error(`Expected antigravity provider to report available or unavailable, got: ${agHealth?.status}`);
   }
   console.log(`[PASS] Antigravity provider clean status check: ${agHealth.status} (${agHealth.message || 'clean'})`);
 
-  // Test 4: Safe resolution with fallback
-  // If agent requests 'antigravity' but it is unavailable, registry fallback should safely provide mock provider
-  const resolved = registry.resolveProviderForAgent({
-    id: 'test-agent',
-    name: 'Test Agent',
+  // Test 4: Provider resolution with safe fallback
+  // Unregistered / unavailable provider safely routes to mock
+  const fallbackResolved = registry.resolveProviderForAgent({
+    id: 'test-agent-fallback',
+    name: 'Test Fallback Agent',
     role: 'Tester',
-    providerId: 'antigravity',
+    providerId: 'unregistered-or-offline-provider',
   } as any);
 
-  if (resolved.provider.id !== 'mock') {
-    throw new Error(`Expected fallback to 'mock' provider, got: ${resolved.provider.id}`);
+  if (fallbackResolved.provider.id !== 'mock') {
+    throw new Error(`Expected fallback to 'mock' provider, got: ${fallbackResolved.provider.id}`);
   }
   console.log('[PASS] Safe fallback resolution routed unavailable provider to mock provider');
+
+  // When Antigravity is available, verify it resolves directly to antigravity
+  if (agHealth.status === 'available') {
+    const agResolved = registry.resolveProviderForAgent({
+      id: 'test-agent-ag',
+      name: 'Test AG Agent',
+      role: 'Coder',
+      providerId: 'antigravity',
+    } as any);
+
+    if (agResolved.provider.id !== 'antigravity') {
+      throw new Error(`Expected resolved provider to be 'antigravity', got: ${agResolved.provider.id}`);
+    }
+    console.log('[PASS] Active Antigravity provider successfully resolved for agent');
+  }
 
   // Test 5: Health check all
   const allHealth = await registry.healthCheckAll();

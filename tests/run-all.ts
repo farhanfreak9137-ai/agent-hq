@@ -42,6 +42,7 @@ async function main() {
     console.log('\n====================================================');
     console.log('ALL PHASE 2, 2.5, 3A & 3B TEST SUITES PASSED 100%!');
     console.log('====================================================');
+    process.exit(0);
   } catch (error) {
     console.error('\nFAILED TESTS:', error);
     process.exit(1);

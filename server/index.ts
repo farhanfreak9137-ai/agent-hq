@@ -55,8 +55,39 @@ if (hasGeminiKey) {
   }
 }
 
+import { execSync } from 'child_process';
+
+let antigravityStatusCache: { available: boolean; version?: string; model?: string; message: string; lastChecked: number } | null = null;
+
+export function checkAntigravityAvailable(): { available: boolean; version?: string; model?: string; message: string } {
+  const now = Date.now();
+  if (antigravityStatusCache && now - antigravityStatusCache.lastChecked < 10000) {
+    return antigravityStatusCache;
+  }
+  try {
+    const version = execSync('agy --version', { stdio: ['pipe', 'pipe', 'ignore'], timeout: 3000 })
+      .toString()
+      .trim();
+    antigravityStatusCache = {
+      available: true,
+      version,
+      model: 'gemini-3.8-flash-low',
+      message: `Official Google Antigravity CLI operational (v${version})`,
+      lastChecked: now,
+    };
+  } catch {
+    antigravityStatusCache = {
+      available: false,
+      message: 'Official Google Antigravity CLI (agy) not found on PATH or runtime unauthenticated.',
+      lastChecked: now,
+    };
+  }
+  return antigravityStatusCache;
+}
+
 // 6. Base Health Check (Backward compatibility)
 app.get('/api/health', (_req: Request, res: Response) => {
+  const agyStatus = checkAntigravityAvailable();
   res.json({
     status: 'ok',
     timestamp: Date.now(),
@@ -65,7 +96,12 @@ app.get('/api/health', (_req: Request, res: Response) => {
     providers: {
       mock: { available: true },
       gemini: { available: hasGeminiKey },
-      antigravity: { available: false, reason: 'Local Antigravity daemon not detected' },
+      antigravity: {
+        available: agyStatus.available,
+        version: agyStatus.version,
+        model: agyStatus.model,
+        reason: agyStatus.available ? undefined : agyStatus.message,
+      },
     },
   });
 });
@@ -81,10 +117,13 @@ app.get('/api/providers/gemini/health', (_req: Request, res: Response) => {
 });
 
 app.get('/api/providers/antigravity/health', (_req: Request, res: Response) => {
+  const agyStatus = checkAntigravityAvailable();
   res.json({
-    available: false,
-    message: 'Official Antigravity daemon not found on local host.',
-    latencyMs: 1,
+    available: agyStatus.available,
+    message: agyStatus.message,
+    version: agyStatus.version,
+    model: agyStatus.model || 'gemini-3.8-flash-low',
+    latencyMs: agyStatus.available ? 8 : 0,
   });
 });
 

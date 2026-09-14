@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { GoogleGenAI } from '@google/genai';
+import { spawn } from 'child_process';
 import { Repositories } from '../repositories/index.ts';
 import { AuthService, AuthenticatedRequest } from '../auth/authService.ts';
 import { Validator } from '../security/validator.ts';
@@ -20,6 +21,91 @@ export function createApiRouter(
 
   const authLimiter = createRateLimiter({ windowMs: 60000, max: 20, message: 'Too many auth attempts.' });
   const taskLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 'Task execution rate limit reached.' });
+
+  interface AgyExecutionResult {
+    conversationId?: string;
+    response: string;
+    durationSeconds?: number;
+    usage?: {
+      inputTokens?: number;
+      outputTokens?: number;
+      thinkingTokens?: number;
+      totalTokens?: number;
+    };
+  }
+
+  function runAntigravityCLI(prompt: string, model: string = 'gemini-3.8-flash-low', timeoutMs: number = 45000): Promise<AgyExecutionResult> {
+    return new Promise((resolve, reject) => {
+      const args = [
+        '--output-format=json',
+        `--model=${model}`,
+        '--effort=low',
+        '--disable-slash-commands',
+        `--print=${prompt}`,
+      ];
+
+      const proc = spawn('agy', args, {
+        shell: false,
+        cwd: process.cwd(),
+        env: process.env,
+      });
+
+      let stdout = '';
+      let stderr = '';
+      let killed = false;
+
+      const timer = setTimeout(() => {
+        killed = true;
+        proc.kill('SIGTERM');
+        setTimeout(() => {
+          if (!proc.killed) proc.kill('SIGKILL');
+        }, 2000).unref();
+        reject(new Error(`Antigravity CLI execution timed out after ${timeoutMs / 1000}s`));
+      }, timeoutMs);
+
+      proc.stdout.on('data', (chunk) => {
+        stdout += chunk.toString();
+      });
+
+      proc.stderr.on('data', (chunk) => {
+        stderr += chunk.toString();
+      });
+
+      proc.on('close', (code) => {
+        clearTimeout(timer);
+        if (killed) return;
+        if (code !== 0) {
+          return reject(new Error(`Antigravity CLI failed with code ${code}: ${stderr || stdout || 'Unknown error'}`));
+        }
+
+        try {
+          const parsed = JSON.parse(stdout.trim());
+          const usageData = parsed.usage ? {
+            inputTokens: parsed.usage.input_tokens,
+            outputTokens: parsed.usage.output_tokens,
+            thinkingTokens: parsed.usage.thinking_tokens,
+            totalTokens: parsed.usage.total_tokens,
+          } : undefined;
+
+          resolve({
+            conversationId: parsed.conversation_id,
+            response: parsed.response || stdout,
+            durationSeconds: parsed.duration_seconds,
+            usage: usageData,
+          });
+        } catch {
+          resolve({
+            response: stdout.trim(),
+          });
+        }
+      });
+
+      proc.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+  }
 
   // ----------------------------------------------------
   // 1. Authentication Endpoints
@@ -280,8 +366,21 @@ export function createApiRouter(
       });
     }
 
-    // Mark task as running in DB
-    repos.tasks.updateStatus(taskId, 'RUNNING', { started_at: Date.now() });
+    // Ensure task exists in DB
+    if (!existingTask) {
+      repos.tasks.create({
+        id: taskId,
+        title,
+        description: description || '',
+        status: 'RUNNING',
+        assigned_agent_id: agentId || null,
+        provider_id: providerId || 'mock',
+        execution_mode: providerId === 'antigravity' || providerId === 'gemini' ? 'real' : 'mock',
+        started_at: Date.now(),
+      });
+    } else {
+      repos.tasks.updateStatus(taskId, 'RUNNING', { started_at: Date.now() });
+    }
 
     // If target provider is Gemini and API key is present
     if (providerId === 'gemini' && hasGeminiKey && aiClient) {
@@ -352,6 +451,78 @@ Produce a structured JSON response with:
         const errorMsg = err instanceof Error ? err.message : String(err);
         repos.tasks.updateStatus(taskId, 'FAILED', { error: errorMsg });
         return res.status(500).json({ error: `Gemini execution failed: ${errorMsg}` });
+      }
+    }
+
+    // If target provider is Antigravity
+    if (providerId === 'antigravity') {
+      try {
+        const startTime = Date.now();
+        const prompt = `You are ${agentName}, an autonomous AI agent with role "${role}" and capabilities: ${JSON.stringify(capabilities)}.
+Execute the following initiative task:
+Task: ${title}
+Requirements: ${description}
+
+Produce a structured JSON response with:
+{
+  "summary": "Concise summary of execution deliverables",
+  "output": "Technical output and findings",
+  "toolsUsed": ["tool_name"]
+}`;
+
+        const agyResult = await runAntigravityCLI(prompt, 'gemini-3.8-flash-low');
+        const durationMs = agyResult.durationSeconds ? Math.round(agyResult.durationSeconds * 1000) : (Date.now() - startTime);
+        const text = agyResult.response || '';
+
+        let parsed: { summary?: string; output?: string; toolsUsed?: string[] } = {};
+        try {
+          const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+          parsed = JSON.parse(cleaned);
+        } catch {
+          parsed = {
+            summary: `${agentName} successfully executed task via Google Antigravity.`,
+            output: text,
+            toolsUsed: ['antigravity_reasoning'],
+          };
+        }
+
+        const result = {
+          summary: parsed.summary || `${agentName} synthesized Antigravity deliverables`,
+          output: parsed.output || text,
+          toolsUsed: parsed.toolsUsed || ['antigravity_reasoning'],
+        };
+
+        repos.tasks.recordResult(taskId, result, 'real');
+        repos.tasks.recordExecution({
+          id: `exec_${taskId}_${Date.now()}`,
+          task_id: taskId,
+          agent_id: agentId,
+          provider_id: 'antigravity',
+          execution_mode: 'real',
+          attempt_number: 1,
+          status: 'completed',
+          started_at: Date.now() - durationMs,
+          completed_at: Date.now(),
+          duration_ms: durationMs,
+          summary: result.summary,
+          output: result.output,
+          tools_used: result.toolsUsed,
+          error: null,
+        });
+
+        return res.json({
+          taskId,
+          agentId,
+          success: true,
+          ...result,
+          executionMode: 'real',
+          conversationId: agyResult.conversationId,
+          usage: agyResult.usage,
+        });
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        repos.tasks.updateStatus(taskId, 'FAILED', { error: errorMsg });
+        return res.status(500).json({ error: `Antigravity execution failed: ${errorMsg}` });
       }
     }
 

@@ -10,6 +10,7 @@ import { ApiClient } from '../services/ApiClient.ts';
 import { ArtifactManager } from '../artifacts/ArtifactManager.ts';
 import { HandoffProtocol } from '../communication/HandoffProtocol.ts';
 import { TelemetryService } from '../telemetry/TelemetryService.ts';
+import { EmailManager } from '../email/EmailManager.ts';
 
 /**
  * BossOrchestrator coordinates multi-agent mission initiatives.
@@ -224,6 +225,18 @@ export class BossOrchestrator {
         artifact: finalArtifact,
         message: `INITIATIVE COMPLETE: ${summary}`,
       } as any);
+
+      // Dispatch Executive Email Briefing to Commander
+      const agentsInvolved = Array.from(
+        new Set(allNodes.map((n) => n.assignedAgentId).filter(Boolean))
+      ) as string[];
+
+      EmailManager.sendMissionReport(
+        title,
+        summary,
+        [{ name: `${title} — Final Synthesis`, type: 'document', content: finalArtifact.content }],
+        agentsInvolved
+      );
 
       AgentManager.setSpeech('boss', 'Outstanding multi-agent execution. Initiative finalized with zero defects.', 4500);
 

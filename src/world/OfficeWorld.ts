@@ -331,15 +331,20 @@ export class OfficeWorld {
       ctx.fill();
       ctx.stroke();
 
-      // Room Title Badge
-      ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
-      const titleWidth = ctx.measureText(room.name.toUpperCase()).width + 18;
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+      // Props inside this room (Rendered first so title badge sits cleanly on top)
+      for (const prop of room.props) {
+        FurnitureRenderer.drawProp(ctx, prop, animTime);
+      }
+
+      // Room Title Badge (Floating on top)
+      ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+      const titleWidth = ctx.measureText(room.name.toUpperCase()).width + 20;
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
       ctx.beginPath();
-      ctx.roundRect(room.x + 12, room.y + 10, titleWidth, 22, 4);
+      ctx.roundRect(room.x + 12, room.y + 10, titleWidth, 22, 5);
       ctx.fill();
-      ctx.strokeStyle = isHovered ? room.colorTheme : 'rgba(71, 85, 105, 0.5)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = isHovered ? room.colorTheme : 'rgba(71, 85, 105, 0.6)';
+      ctx.lineWidth = isHovered ? 1.5 : 1;
       ctx.stroke();
 
       // Mini room dot
@@ -355,11 +360,6 @@ export class OfficeWorld {
       ctx.fillText(room.name.toUpperCase(), room.x + 30, room.y + 21);
 
       ctx.restore();
-
-      // Props inside this room
-      for (const prop of room.props) {
-        FurnitureRenderer.drawProp(ctx, prop, animTime);
-      }
     }
   }
 

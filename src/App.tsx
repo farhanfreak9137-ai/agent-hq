@@ -15,6 +15,9 @@ import { TaskBoardModal } from './components/TaskBoardModal.tsx';
 import { CreateTaskModal } from './components/CreateTaskModal.tsx';
 import { DispatchMissionModal } from './components/DispatchMissionModal.tsx';
 import { MissionDashboard } from './components/MissionDashboard.tsx';
+import { EmailInboxModal } from './components/EmailInboxModal.tsx';
+import { EmailManager } from './email/EmailManager.ts';
+import { ExecutiveEmail } from './email/EmailTypes.ts';
 import { ApiClient } from './services/ApiClient.ts';
 import { EventStreamClient } from './services/EventStreamClient.ts';
 
@@ -27,6 +30,8 @@ export default function App() {
   // Reactive UI state
   const [agents, setAgents] = useState<AgentModel[]>(() => AgentManager.getAll());
   const [tasks, setTasks] = useState<TaskModel[]>(() => TaskManager.getAll());
+  const [emails, setEmails] = useState<ExecutiveEmail[]>(() => EmailManager.getAll());
+  const [unreadEmailCount, setUnreadEmailCount] = useState<number>(() => EmailManager.getUnreadCount());
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<{ username: string; role: string } | null>(null);
   const [persistenceStatus, setPersistenceStatus] = useState<string>('SQLite Synced');
@@ -41,6 +46,7 @@ export default function App() {
   const [isDispatchMissionOpen, setIsDispatchMissionOpen] = useState<boolean>(false);
   const [isTaskBoardOpen, setIsTaskBoardOpen] = useState<boolean>(false);
   const [isMissionDashboardOpen, setIsMissionDashboardOpen] = useState<boolean>(false);
+  const [isInboxOpen, setIsInboxOpen] = useState<boolean>(false);
 
   // Initialize SSE event stream and sync persistent state on mount
   useEffect(() => {
@@ -85,13 +91,21 @@ export default function App() {
   useEffect(() => {
     const unsub = EventBus.on('*', (ev) => {
       // Refresh agents & tasks when their state, position, or tasks change
+      const t = ev.type as string;
       if (
-        ev.type.startsWith('agent.') ||
-        ev.type === 'simulation.reset' ||
-        ev.type.startsWith('mission.')
+        t.startsWith('agent.') ||
+        t.startsWith('task.') ||
+        t === 'tasks.cleared' ||
+        t === 'simulation.reset' ||
+        t.startsWith('mission.')
       ) {
         setAgents([...AgentManager.getAll()]);
         setTasks([...TaskManager.getAll()]);
+      }
+
+      if (t.startsWith('email.')) {
+        setEmails([...EmailManager.getAll()]);
+        setUnreadEmailCount(EmailManager.getUnreadCount());
       }
 
       // Explicit event-driven mission UI updates
@@ -201,6 +215,8 @@ export default function App() {
         onOpenCreateTask={() => setIsCreateTaskOpen(true)}
         onOpenTaskBoard={() => setIsTaskBoardOpen(true)}
         onOpenMissionDashboard={() => setIsMissionDashboardOpen(true)}
+        onOpenInbox={() => setIsInboxOpen(true)}
+        unreadEmailCount={unreadEmailCount}
         currentUser={currentUser}
         persistenceStatus={persistenceStatus}
       />
@@ -259,6 +275,15 @@ export default function App() {
         isOpen={isMissionDashboardOpen}
         onClose={() => setIsMissionDashboardOpen(false)}
         agents={agents}
+      />
+
+      <EmailInboxModal
+        isOpen={isInboxOpen}
+        onClose={() => {
+          setIsInboxOpen(false);
+          setUnreadEmailCount(EmailManager.getUnreadCount());
+        }}
+        emails={emails}
       />
     </div>
   );

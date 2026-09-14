@@ -291,6 +291,29 @@ class TaskManagerClass {
     this.save();
   }
 
+  public updateStatus(taskId: string, status: TaskStatus, result?: any): void {
+    const task = this.tasks.get(taskId);
+    if (!task) return;
+    task.status = status;
+    if (status === 'IN_PROGRESS') {
+      if (!task.startedAt) task.startedAt = Date.now();
+      task.progress = Math.max(task.progress, 20);
+    } else if (status === 'COMPLETED') {
+      task.completedAt = Date.now();
+      task.progress = 100;
+      if (result) task.result = result;
+    }
+    this.save();
+    EventBus.emit({
+      id: generateId('ev'),
+      type: status === 'IN_PROGRESS' ? 'task.started' : status === 'COMPLETED' ? 'task.completed' : 'task.progress',
+      taskId,
+      timestamp: Date.now(),
+      status,
+      result,
+    } as any);
+  }
+
   public reset(): void {
     this.tasks.clear();
     INITIAL_TASKS.forEach((t) => this.tasks.set(t.id, { ...t }));
@@ -307,6 +330,13 @@ class TaskManagerClass {
     } catch (e) {
       console.warn('[TaskManager] Error deleting server tasks:', e);
     }
+    this.save();
+    EventBus.emit({
+      id: generateId('ev'),
+      type: 'tasks.cleared' as any,
+      timestamp: Date.now(),
+      message: 'All tasks cleared',
+    } as any);
   }
 
   private save(): void {

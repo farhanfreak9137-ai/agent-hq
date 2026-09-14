@@ -5,6 +5,7 @@ import { TaskManager } from '../tasks/TaskManager.ts';
 import { AgentManager } from '../agents/AgentManager.ts';
 import { SimulationEngine } from '../simulation/SimulationEngine.ts';
 import { BossOrchestrator } from '../orchestration/BossOrchestrator.ts';
+import { EmailManager } from '../email/EmailManager.ts';
 
 interface CreateTaskModalProps {
   agents: AgentModel[];
@@ -22,7 +23,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('HIGH');
-  const [assignedAgentId, setAssignedAgentId] = useState<string>('nova');
+  const [assignedAgentId, setAssignedAgentId] = useState<string>('boss');
 
   if (!isOpen) return null;
 
@@ -47,6 +48,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     });
 
     if (assignedAgentId) {
+      TaskManager.updateStatus(newTask.id, 'IN_PROGRESS');
       AgentManager.assignTask(assignedAgentId, newTask.id);
       AgentManager.setStatus(assignedAgentId, 'WORKING', `Working on "${title.trim()}"`);
       AgentManager.setSpeech(assignedAgentId, `Starting work on: ${title.trim()}`, 4000);
@@ -59,9 +61,25 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       );
 
       // Automatically execute the task via the AgentManager runtime!
-      AgentManager.executeTask(assignedAgentId, newTask).catch((err) => {
-        console.warn('[CreateTaskModal] Direct task execution error:', err);
-      });
+      AgentManager.executeTask(assignedAgentId, newTask)
+        .then((result) => {
+          if (result.success) {
+            TaskManager.updateStatus(newTask.id, 'COMPLETED', result);
+            EmailManager.sendTaskReport(
+              assignedAgentId,
+              title.trim(),
+              result.summary || 'Direct task completed successfully.',
+              result.output,
+              result.toolsUsed
+            );
+          } else {
+            TaskManager.updateStatus(newTask.id, 'BLOCKED', { error: result.error });
+          }
+        })
+        .catch((err) => {
+          console.warn('[CreateTaskModal] Direct task execution error:', err);
+          TaskManager.updateStatus(newTask.id, 'BLOCKED', { error: String(err) });
+        });
     }
 
     setTitle('');

@@ -385,7 +385,7 @@ export class AgentSpriteRenderer {
       const textWidth = Math.min(220, Math.max(70, textMetrics.width));
       const bubbleWidth = textWidth + 18;
       const bubbleHeight = 24;
-      const speechBubbleY = -48 + bobY;
+      const speechBubbleY = -56 + bobY;
 
       // Bubble background
       ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
@@ -418,22 +418,22 @@ export class AgentSpriteRenderer {
       ctx.restore();
     }
 
-    // 10. Agent Name Tag & Role symbol
+    // 10. Agent Name Tag & Role symbol (Cleanly floating above head)
     ctx.save();
     ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
-    const tagWidth = ctx.measureText(`${agent.roleSymbol} ${agent.name}`).width + 12;
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    const tagWidth = ctx.measureText(`${agent.roleSymbol} ${agent.name}`).width + 14;
+    ctx.fillStyle = isSelected ? 'rgba(15, 23, 42, 0.95)' : 'rgba(15, 23, 42, 0.85)';
     ctx.beginPath();
-    ctx.roundRect(-tagWidth / 2, 14, tagWidth, 16, 4);
+    ctx.roundRect(-tagWidth / 2, -37, tagWidth, 16, 4);
     ctx.fill();
-    ctx.strokeStyle = isSelected ? '#38bdf8' : 'rgba(148, 163, 184, 0.3)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = isSelected ? '#38bdf8' : 'rgba(148, 163, 184, 0.4)';
+    ctx.lineWidth = isSelected ? 1.5 : 1;
     ctx.stroke();
 
     ctx.fillStyle = isSelected ? '#38bdf8' : '#e2e8f0';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`${agent.roleSymbol} ${agent.name}`, 0, 22);
+    ctx.fillText(`${agent.roleSymbol} ${agent.name}`, 0, -29);
     ctx.restore();
 
     ctx.restore(); // Restore main agent translate

@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { GoogleGenAI } from '@google/genai';
 import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 import { Repositories } from '../repositories/index.ts';
 import { AuthService, AuthenticatedRequest } from '../auth/authService.ts';
 import { Validator } from '../security/validator.ts';
@@ -18,6 +20,46 @@ export function createApiRouter(
   hasGeminiKey: boolean
 ): Router {
   const router = Router();
+
+  function resolveFileContext(text: string): string {
+    if (!text) return '';
+    const potentialPaths: string[] = Array.from(
+      text.match(/[a-zA-Z]:\\[^\s"'\n\r<>|*?]+|\.\.?[\\\/][^\s"'\n\r<>|*?]+|workspace[\\\/][^\s"'\n\r<>|*?]+/g) || []
+    );
+
+    const workspaceDir = path.resolve(process.cwd(), 'workspace');
+    if (fs.existsSync(workspaceDir)) {
+      try {
+        const workspaceFiles = fs.readdirSync(workspaceDir);
+        for (const f of workspaceFiles) {
+          if (text.includes(f) && !potentialPaths.includes(f)) {
+            potentialPaths.push(path.join(workspaceDir, f));
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    let attached = '';
+    const visited = new Set<string>();
+    for (const rawPath of potentialPaths) {
+      try {
+        const clean = rawPath.replace(/[,\.;:!?)]+$/, '').trim();
+        const resolved = path.isAbsolute(clean) ? clean : path.resolve(process.cwd(), clean);
+        if (visited.has(resolved)) continue;
+        visited.add(resolved);
+
+        if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
+          const content = fs.readFileSync(resolved, 'utf-8');
+          attached += `\n\n--- [Attached File Content: ${path.basename(resolved)}] ---\n${content.slice(0, 40000)}\n--- [End of ${path.basename(resolved)}] ---\n`;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return attached;
+  }
 
   const authLimiter = createRateLimiter({ windowMs: 60000, max: 20, message: 'Too many auth attempts.' });
   const taskLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 'Task execution rate limit reached.' });
@@ -382,13 +424,16 @@ export function createApiRouter(
       repos.tasks.updateStatus(taskId, 'RUNNING', { started_at: Date.now() });
     }
 
+    const fileContext = resolveFileContext(`${title} ${description || ''}`);
+    const fullRequirements = `${description || ''}${fileContext}`;
+
     // If target provider is Gemini and API key is present
     if (providerId === 'gemini' && hasGeminiKey && aiClient) {
       try {
         const prompt = `You are ${agentName}, an autonomous AI agent with role "${role}" and capabilities: ${JSON.stringify(capabilities)}.
 Execute the following initiative task:
 Task: ${title}
-Requirements: ${description}
+Requirements: ${fullRequirements}
 
 Produce a structured JSON response with:
 {
@@ -461,7 +506,7 @@ Produce a structured JSON response with:
         const prompt = `You are ${agentName}, an autonomous AI agent with role "${role}" and capabilities: ${JSON.stringify(capabilities)}.
 Execute the following initiative task:
 Task: ${title}
-Requirements: ${description}
+Requirements: ${fullRequirements}
 
 Produce a structured JSON response with:
 {

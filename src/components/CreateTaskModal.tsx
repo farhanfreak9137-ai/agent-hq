@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Sparkles } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 import { AgentModel, TaskPriority } from '../types/index.ts';
 import { TaskManager } from '../tasks/TaskManager.ts';
 import { AgentManager } from '../agents/AgentManager.ts';
@@ -54,14 +54,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     onClose();
   };
 
-  const sampleTasks = [
-    { t: 'Build landing page UI components', a: 'pixel', p: 'HIGH' as TaskPriority },
-    { t: 'Analyze competitor AI models & benchmarks', a: 'atlas', p: 'MEDIUM' as TaskPriority },
-    { t: 'Fix authentication session refresh token bug', a: 'nova', p: 'CRITICAL' as TaskPriority },
-    { t: 'Run automated fuzz security audit on API', a: 'sentinel', p: 'HIGH' as TaskPriority },
-    { t: 'Write end-to-end integration test suite', a: 'vector', p: 'MEDIUM' as TaskPriority },
-  ];
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
       <div className="w-full max-w-lg bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
@@ -72,7 +64,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               <Plus className="w-4 h-4" />
             </div>
             <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider">
-              Delegate New Task
+              Delegate Direct Task
             </h3>
           </div>
           <button
@@ -137,27 +129,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                   </option>
                 ))}
               </select>
-            </div>
-          </div>
-
-          {/* Quick presets */}
-          <div>
-            <span className="block text-[11px] text-slate-400 mb-1.5 font-medium">Quick Presets:</span>
-            <div className="flex flex-wrap gap-1.5">
-              {sampleTasks.map((s, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => {
-                    setTitle(s.t);
-                    setAssignedAgentId(s.a);
-                    setPriority(s.p);
-                  }}
-                  className="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] text-slate-300 transition text-left"
-                >
-                  {s.t}
-                </button>
-              ))}
             </div>
           </div>
 

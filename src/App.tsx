@@ -13,6 +13,7 @@ import { ActivityFeed } from './components/ActivityFeed.tsx';
 import { AgentInspector } from './components/AgentInspector.tsx';
 import { TaskBoardModal } from './components/TaskBoardModal.tsx';
 import { CreateTaskModal } from './components/CreateTaskModal.tsx';
+import { DispatchMissionModal } from './components/DispatchMissionModal.tsx';
 import { MissionDashboard } from './components/MissionDashboard.tsx';
 import { ApiClient } from './services/ApiClient.ts';
 import { EventStreamClient } from './services/EventStreamClient.ts';
@@ -37,6 +38,7 @@ export default function App() {
   const [totalMissionSteps, setTotalMissionSteps] = useState<number>(0);
 
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState<boolean>(false);
+  const [isDispatchMissionOpen, setIsDispatchMissionOpen] = useState<boolean>(false);
   const [isTaskBoardOpen, setIsTaskBoardOpen] = useState<boolean>(false);
   const [isMissionDashboardOpen, setIsMissionDashboardOpen] = useState<boolean>(false);
 
@@ -154,6 +156,15 @@ export default function App() {
     camera.focusOnPosition({ x: 760, y: 380 }, 0.95);
   }, [camera, simulationEngine]);
 
+  const handleDispatchMission = useCallback(
+    (goal: string, description?: string) => {
+      simulationEngine.launchMission(goal, description);
+      // Center camera on command room
+      camera.focusOnPosition({ x: 760, y: 380 }, 0.95);
+    },
+    [camera, simulationEngine]
+  );
+
   const handleSelectAgent = useCallback((agent: AgentModel | null) => {
     setSelectedAgentId(agent ? agent.id : null);
   }, []);
@@ -186,6 +197,7 @@ export default function App() {
         onSetSpeed={handleSetSpeed}
         onReset={handleReset}
         onRunDemoMission={handleRunDemoMission}
+        onOpenDispatchMission={() => setIsDispatchMissionOpen(true)}
         onOpenCreateTask={() => setIsCreateTaskOpen(true)}
         onOpenTaskBoard={() => setIsTaskBoardOpen(true)}
         onOpenMissionDashboard={() => setIsMissionDashboardOpen(true)}
@@ -234,6 +246,13 @@ export default function App() {
         isOpen={isCreateTaskOpen}
         onClose={() => setIsCreateTaskOpen(false)}
         simulationEngine={simulationEngine}
+      />
+
+      <DispatchMissionModal
+        isOpen={isDispatchMissionOpen}
+        onClose={() => setIsDispatchMissionOpen(false)}
+        onDispatch={handleDispatchMission}
+        isDispatching={Boolean(activeMissionName)}
       />
 
       <MissionDashboard

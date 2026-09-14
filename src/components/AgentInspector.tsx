@@ -406,9 +406,15 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
                 <div className="flex items-center justify-between">
                   <span>Assigned Provider:</span>
                   <div className="flex items-center gap-1.5">
-                    <span className="px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 font-mono text-[10px] uppercase font-bold">
-                      {agent.providerId || 'mock'}
-                    </span>
+                    <select
+                      value={agent.providerId || 'mock'}
+                      onChange={(e) => AgentManager.setAgentProvider(agent.id, e.target.value)}
+                      className="px-2 py-0.5 rounded bg-slate-950 border border-slate-700 text-cyan-300 font-mono text-[10px] uppercase font-bold focus:outline-none focus:border-cyan-500 cursor-pointer"
+                    >
+                      <option value="antigravity">Antigravity (agy)</option>
+                      <option value="gemini">Gemini API</option>
+                      <option value="mock">Local Engine</option>
+                    </select>
                     <span className={`px-1.5 py-0.5 rounded font-mono text-[9px] uppercase font-bold ${
                       agent.providerId === 'mock' || !agent.providerId
                         ? 'bg-slate-800 text-slate-400 border border-slate-700'

@@ -359,6 +359,22 @@ class AgentManagerClass {
     this.setTargetPosition(agentId, { ...agent.deskPosition });
   }
 
+  public setAgentProvider(agentId: string, providerId: string): void {
+    const agent = this.agents.get(agentId);
+    if (!agent) return;
+    agent.providerId = providerId;
+    this.runtimes.delete(agentId);
+    EventBus.emit({
+      id: generateId('ev'),
+      type: 'agent.state_changed',
+      timestamp: Date.now(),
+      agentId,
+      previousStatus: agent.status,
+      currentStatus: agent.status,
+      message: `${agent.name} provider updated to [${providerId}]`,
+    });
+  }
+
   public incrementStats(agentId: string, key: keyof AgentModel['stats'], amount: number = 1): void {
     const agent = this.agents.get(agentId);
     if (!agent) return;

@@ -15,7 +15,8 @@ interface TopBarProps {
   onTogglePlay: () => void;
   onSetSpeed: (speed: number) => void;
   onReset: () => void;
-  onRunDemoMission: () => void;
+  onRunDemoMission?: () => void;
+  onOpenDispatchMission?: () => void;
   onOpenCreateTask: () => void;
   onOpenTaskBoard: () => void;
   onOpenMissionDashboard?: () => void;
@@ -35,6 +36,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onSetSpeed,
   onReset,
   onRunDemoMission,
+  onOpenDispatchMission,
   onOpenCreateTask,
   onOpenTaskBoard,
   onOpenMissionDashboard,
@@ -264,18 +266,18 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span className="hidden sm:inline">New Task</span>
         </button>
 
-        {/* Primary Demo Mission Button */}
+        {/* Primary Dispatch Mission Button */}
         <button
-          onClick={onRunDemoMission}
+          onClick={onOpenDispatchMission || onRunDemoMission}
           disabled={Boolean(activeMissionName)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-md transition ${
             activeMissionName
               ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-              : 'bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-cyan-500/20 border border-cyan-400/40 cursor-pointer active:scale-95'
+              : 'bg-gradient-to-r from-amber-500 via-indigo-600 to-cyan-500 hover:from-amber-400 hover:to-cyan-400 text-white shadow-amber-500/20 border border-amber-400/40 cursor-pointer active:scale-95'
           }`}
         >
-          <Sparkles className="w-3.5 h-3.5 text-cyan-200" />
-          <span>Run Demo Mission</span>
+          <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+          <span>Dispatch Mission</span>
         </button>
       </div>
     </header>

@@ -297,34 +297,33 @@ export class SimulationEngine {
   }
 
   /**
-   * Run Demo Mission:
-   * Launches multi-agent orchestrated workflow via BossOrchestrator and DAG:
-   * "Operation Aegis: Zero-Trust Authentication Architecture"
+   * Launch Real User Mission:
+   * Dynamically plans and executes an autonomous multi-agent DAG via BossOrchestrator.
    */
-  public async runDemoMission(): Promise<void> {
+  public async launchMission(goal: string, description?: string): Promise<void> {
     if (this.missionAbortController) {
       this.missionAbortController.abort();
     }
     this.missionAbortController = new AbortController();
 
-    this.activeMissionName = 'Operation Aegis: Zero-Trust Authentication Architecture';
+    this.activeMissionName = goal;
     this.activeMissionStep = 1;
-    this.totalMissionSteps = 7;
+    this.totalMissionSteps = 6;
 
     EventBus.emit({
       id: generateId('ev'),
       type: 'mission.started',
       timestamp: Date.now(),
-      message: 'MISSION LAUNCHED: "Operation Aegis — Zero-Trust Authentication Architecture" (DAG Pipeline)',
-      missionId: 'mission_aegis',
-      missionName: this.activeMissionName,
+      message: `MISSION DISPATCHED: "${goal}" (Autonomous Multi-Agent DAG)`,
+      missionId: generateId('mission'),
+      missionName: goal,
       stepIndex: 1,
-      totalSteps: 7,
+      totalSteps: 6,
     });
 
     try {
       const orchestrator = BossOrchestrator.getInstance();
-      const result = await orchestrator.runOperationAegis();
+      const result = await orchestrator.launchCustomMission(goal, description);
 
       if (result.success) {
         // Confetti celebration
@@ -344,11 +343,11 @@ export class SimulationEngine {
           id: generateId('ev'),
           type: 'mission.completed',
           timestamp: Date.now(),
-          message: 'MISSION ACCOMPLISHED: Operation Aegis DAG executed successfully across all nodes!',
-          missionId: 'mission_aegis',
-          missionName: this.activeMissionName,
-          stepIndex: 7,
-          totalSteps: 7,
+          message: `MISSION COMPLETED: "${goal}" executed successfully across all nodes!`,
+          missionId: result.initiativeId,
+          missionName: goal,
+          stepIndex: 6,
+          totalSteps: 6,
         });
 
         await new Promise((r) => setTimeout(r, 4000 / this.speed));
@@ -357,8 +356,8 @@ export class SimulationEngine {
           id: generateId('ev'),
           type: 'mission.failed',
           timestamp: Date.now(),
-          missionId: 'mission_aegis',
-          missionName: this.activeMissionName || 'Operation Aegis',
+          missionId: result.initiativeId,
+          missionName: goal,
           error: result.error || 'DAG execution failed',
           message: `Mission halted: ${result.error}`,
         });
@@ -369,8 +368,8 @@ export class SimulationEngine {
         id: generateId('ev'),
         type: 'mission.failed',
         timestamp: Date.now(),
-        missionId: 'mission_aegis',
-        missionName: this.activeMissionName || 'Operation Aegis',
+        missionId: 'mission_custom',
+        missionName: goal,
         error: errorMsg,
         message: `Mission failed: ${errorMsg}`,
       });
@@ -379,5 +378,15 @@ export class SimulationEngine {
       this.activeMissionStep = 0;
       this.totalMissionSteps = 0;
     }
+  }
+
+  /**
+   * Backward-compatible demo mission alias
+   */
+  public async runDemoMission(): Promise<void> {
+    return this.launchMission(
+      'Audit System Architecture & Verify Zero-Trust Compliance',
+      'Autonomous multi-agent verification and deliverable compilation.'
+    );
   }
 }

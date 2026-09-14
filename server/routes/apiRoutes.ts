@@ -31,6 +31,103 @@ export function createApiRouter(
   const router = Router();
   let activeGeminiIndex = 0;
 
+  function scanAndResolveDirectory(dirPath: string, maxDepth: number = 3, maxContentChars: number = 45000): string {
+    const IGNORED = new Set(['.git', 'node_modules', 'dist', 'build', '.agents', 'coverage', '.cache', '.system_generated']);
+    let totalFiles = 0;
+    let totalDirs = 0;
+    const treeLines: string[] = [];
+    const candidates: { relPath: string; fullPath: string; size: number; priority: number }[] = [];
+
+    function walk(currentDir: string, currentDepth: number) {
+      try {
+        const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (IGNORED.has(entry.name)) continue;
+          const fullPath = path.join(currentDir, entry.name);
+          const relPath = path.relative(dirPath, fullPath);
+          const indent = '  '.repeat(currentDepth);
+
+          if (entry.isDirectory()) {
+            totalDirs++;
+            treeLines.push(`${indent}📁 ${entry.name}/`);
+            if (currentDepth < maxDepth) {
+              walk(fullPath, currentDepth + 1);
+            }
+          } else if (entry.isFile()) {
+            totalFiles++;
+            let size = 0;
+            try {
+              size = fs.statSync(fullPath).size;
+            } catch {}
+            const sizeStr = size > 1024 * 1024 ? `${(size / (1024 * 1024)).toFixed(1)} MB` : `${(size / 1024).toFixed(1)} KB`;
+            treeLines.push(`${indent}📄 ${entry.name} (${sizeStr})`);
+
+            const ext = path.extname(entry.name).toLowerCase();
+            const lowerName = entry.name.toLowerCase();
+
+            let priority = 0;
+            if (lowerName.includes('readme') || lowerName.includes('index') || lowerName.includes('rules') || lowerName.includes('glossary')) {
+              priority = 100;
+            } else if (ext === '.md' || ext === '.txt') {
+              priority = 80;
+            } else if (ext === '.json' || ext === '.yaml' || ext === '.yml' || ext === '.toml') {
+              priority = 50;
+            } else if (['.ts', '.js', '.py', '.html', '.css'].includes(ext)) {
+              priority = 40;
+            }
+
+            if (priority > 0) {
+              candidates.push({ relPath, fullPath, size, priority });
+            }
+          }
+        }
+      } catch (err) {
+        treeLines.push(`Error reading ${currentDir}: ${err}`);
+      }
+    }
+
+    walk(dirPath, 0);
+
+    candidates.sort((a, b) => b.priority - a.priority || a.size - b.size);
+
+    let output = `\n\n--- [Attached Directory Context: ${path.basename(dirPath)} (${dirPath})] ---\n`;
+    output += `Total Items: ${totalFiles} files across ${totalDirs} subdirectories\n\n`;
+    output += `Directory Structure Hierarchy:\n${treeLines.slice(0, 75).join('\n')}\n`;
+    if (treeLines.length > 75) {
+      output += `... [${treeLines.length - 75} additional files/folders omitted for brevity]\n`;
+    }
+    output += `\n--- Ingested Key Files from Directory ---\n`;
+
+    let usedChars = 0;
+    let ingestedCount = 0;
+
+    for (const file of candidates) {
+      if (usedChars >= maxContentChars) break;
+      try {
+        const remainingChars = maxContentChars - usedChars;
+        let content = fs.readFileSync(file.fullPath, 'utf-8');
+
+        if (content.length > 8000) {
+          content = content.slice(0, 8000) + `\n... [Truncated ${content.length - 8000} remaining characters of ${file.relPath}]`;
+        }
+        if (content.length > remainingChars) {
+          content = content.slice(0, remainingChars) + `\n... [Truncated to fit context budget]`;
+        }
+
+        output += `\n>>> File: ${file.relPath} (${(file.size / 1024).toFixed(1)} KB) <<<\n${content}\n>>> End of ${file.relPath} <<<\n`;
+        usedChars += content.length;
+        ingestedCount++;
+      } catch {
+        // ignore
+      }
+    }
+
+    output += `\n--- End of Ingested Key Files (${ingestedCount} files read, ${usedChars} characters ingested) ---\n`;
+    output += `--- [End of Directory Context: ${path.basename(dirPath)}] ---\n\n`;
+
+    return output;
+  }
+
   function resolveFileContext(text: string): string {
     if (!text) return '';
     const potentialPaths: string[] = Array.from(
@@ -60,9 +157,14 @@ export function createApiRouter(
         if (visited.has(resolved)) continue;
         visited.add(resolved);
 
-        if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
-          const content = fs.readFileSync(resolved, 'utf-8');
-          attached += `\n\n--- [Attached File Content: ${path.basename(resolved)}] ---\n${content.slice(0, 40000)}\n--- [End of ${path.basename(resolved)}] ---\n`;
+        if (fs.existsSync(resolved)) {
+          const stat = fs.statSync(resolved);
+          if (stat.isFile()) {
+            const content = fs.readFileSync(resolved, 'utf-8');
+            attached += `\n\n--- [Attached File Content: ${path.basename(resolved)}] ---\n${content.slice(0, 40000)}\n--- [End of ${path.basename(resolved)}] ---\n`;
+          } else if (stat.isDirectory()) {
+            attached += scanAndResolveDirectory(resolved);
+          }
         }
       } catch {
         // ignore
@@ -636,14 +738,20 @@ Produce a structured JSON response with:
         const text = cascadeRes.text || '';
         let parsed: { summary?: string; output?: string; toolsUsed?: string[] } = {};
         try {
-          const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-          parsed = JSON.parse(cleaned);
+          const jsonMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+          const toParse = jsonMatch ? jsonMatch[1].trim() : text.trim();
+          parsed = JSON.parse(toParse);
         } catch {
-          parsed = {
-            summary: `${agentName} executed task via ${cascadeRes.provider.toUpperCase()} (${cascadeRes.model}).`,
-            output: text,
-            toolsUsed: cascadeRes.toolsUsed,
-          };
+          try {
+            const cleaned = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+            parsed = JSON.parse(cleaned);
+          } catch {
+            parsed = {
+              summary: `${agentName} executed task via ${cascadeRes.provider.toUpperCase()} (${cascadeRes.model}).`,
+              output: text,
+              toolsUsed: cascadeRes.toolsUsed,
+            };
+          }
         }
 
         const durationMs = cascadeRes.durationMs || 1200;

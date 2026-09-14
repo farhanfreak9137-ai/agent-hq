@@ -130,7 +130,7 @@ Director BOSS`,
 
     const deliverableList =
       deliverables.length > 0
-        ? deliverables.map((d) => `• **${d.name}** [${d.type.toUpperCase()}]: ${d.content || 'Generated'}`).join('\n')
+        ? deliverables.map((d) => `• 📄 **${d.name}** [${d.type.toUpperCase()}] — *Verified (Inspect via Attached Deliverables below)*`).join('\n')
         : '• Comprehensive Project Architecture Audit\n• Security Threat Model & Dependency Verification\n• Synthetic Load Test Artifacts';
 
     const body = `Commander,

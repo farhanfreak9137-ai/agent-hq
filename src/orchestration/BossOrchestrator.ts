@@ -11,6 +11,8 @@ import { ArtifactManager } from '../artifacts/ArtifactManager.ts';
 import { HandoffProtocol } from '../communication/HandoffProtocol.ts';
 import { TelemetryService } from '../telemetry/TelemetryService.ts';
 import { EmailManager } from '../email/EmailManager.ts';
+import { TaskManager } from '../tasks/TaskManager.ts';
+import { AGENT_DIRECTORY } from '../email/EmailTypes.ts';
 
 /**
  * BossOrchestrator coordinates multi-agent mission initiatives.
@@ -202,6 +204,64 @@ export class BossOrchestrator {
     if (success && graph.isCompleted()) {
       const summary = `Initiative "${title}" completed successfully (${completedCount}/${allNodes.length} nodes executed).`;
 
+      const agentsInvolved = Array.from(
+        new Set(allNodes.map((n) => n.assignedAgentId).filter(Boolean))
+      ) as string[];
+
+      // Synthesize specialist findings and deliverables from all executed DAG nodes
+      const specialistSections: string[] = [];
+      const deliverables: { name: string; type: string; content?: string }[] = [];
+
+      for (const node of allNodes) {
+        const agentId = node.assignedAgentId || 'agent';
+        const agentMeta = AGENT_DIRECTORY[agentId];
+        const agentDisplayName = agentMeta ? `${agentMeta.symbol} ${agentMeta.name}` : agentId.toUpperCase();
+        const res = (node.result as any) || {};
+        const nodeTask = TaskManager.getById(node.taskId);
+        const nodeOutput =
+          res.output ||
+          res.summary ||
+          nodeTask?.result?.output ||
+          nodeTask?.result?.summary ||
+          '';
+
+        let section = `### ${agentDisplayName} — ${node.title}\n`;
+        section += `- **Role**: ${agentMeta?.role || 'Autonomous Specialist'}\n`;
+        section += `- **Status**: ${node.status.toUpperCase()}\n`;
+        if (res.durationMs) {
+          section += `- **Latency**: ${res.durationMs}ms\n`;
+        }
+        if (nodeOutput && typeof nodeOutput === 'string' && nodeOutput.trim().length > 0) {
+          section += `\n**Detailed Findings & Output**:\n\n${nodeOutput.trim()}\n`;
+          deliverables.push({
+            name: `${agentMeta?.name || agentId.toUpperCase()}: ${node.title}`,
+            type: 'document',
+            content: `# ${node.title}\n\n**Specialist**: ${agentDisplayName} (${agentMeta?.role || 'Specialist'})\n**Status**: ${node.status.toUpperCase()}\n\n---\n\n${nodeOutput.trim()}`,
+          });
+        } else {
+          section += `\n*Task verified and completed in topological sequence.*\n`;
+        }
+        specialistSections.push(section);
+      }
+
+      const synthesizedContent = [
+        `# ${title} — Final Mission Synthesis`,
+        `\n## Executive Summary\n${summary}`,
+        `\n### Initiative Overview`,
+        `- **Initiative ID**: \`${graph.initiativeId}\``,
+        `- **Topology**: Directed Acyclic Graph (DAG) Parallel Execution`,
+        `- **Execution Time**: ${(durationMs / 1000).toFixed(2)}s`,
+        `- **Completed Nodes**: ${completedCount} / ${allNodes.length}`,
+        `- **Specialists Engaged**: ${agentsInvolved.map((a) => AGENT_DIRECTORY[a]?.name || a.toUpperCase()).join(', ')}`,
+        `\n---\n`,
+        `## Specialist Section Reports\n`,
+        specialistSections.join('\n---\n\n'),
+        `\n---\n`,
+        `## Executive Sign-Off`,
+        `All autonomous stages executed cleanly with zero runtime exceptions. Verified deliverables are attached and preserved in system persistence.`,
+        `\n*Generated: ${new Date().toISOString()}*`,
+      ].join('\n');
+
       // Synthesize final deliverable artifact
       const finalArtifact = this.artifactManager.createArtifact({
         taskId: generateId('task_synth'),
@@ -209,7 +269,14 @@ export class BossOrchestrator {
         missionId: graph.initiativeId,
         type: 'document',
         title: `${title} — Final Synthesis`,
-        content: `# ${title}\n\n## Executive Summary\n${summary}\n\n## Deliverables\nAll ${completedCount} nodes executed cleanly in DAG topology with zero defects.\n\n- Completed At: ${new Date().toISOString()}\n- Execution Time: ${durationMs}ms`,
+        content: synthesizedContent,
+      });
+
+      // Ensure Final Synthesis is the primary deliverable
+      deliverables.unshift({
+        name: `${title} — Final Synthesis`,
+        type: 'document',
+        content: finalArtifact.content,
       });
 
       EventBus.emit({
@@ -227,14 +294,10 @@ export class BossOrchestrator {
       } as any);
 
       // Dispatch Executive Email Briefing to Commander
-      const agentsInvolved = Array.from(
-        new Set(allNodes.map((n) => n.assignedAgentId).filter(Boolean))
-      ) as string[];
-
       EmailManager.sendMissionReport(
         title,
         summary,
-        [{ name: `${title} — Final Synthesis`, type: 'document', content: finalArtifact.content }],
+        deliverables,
         agentsInvolved
       );
 

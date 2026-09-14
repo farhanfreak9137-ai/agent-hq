@@ -53,8 +53,8 @@ const backendProcess = spawn(npxCmd, ['tsx', 'server/index.ts'], {
 });
 
 // Start Frontend Dev Server
-console.log('[2/3] Starting Agent HQ Frontend Vite UI (Port 3000)...');
-const frontendProcess = spawn(npxCmd, ['vite', '--port=3000', '--host=0.0.0.0'], {
+console.log('[2/3] Starting Agent HQ Frontend Vite UI (Port 3005)...');
+const frontendProcess = spawn(npxCmd, ['vite', '--port=3005', '--host=0.0.0.0'], {
   cwd: rootDir,
   shell: isWin,
   stdio: 'inherit',
@@ -90,21 +90,21 @@ process.on('exit', cleanup);
 async function main() {
   // Wait for both services to be responsive
   await waitForServer('Backend API', 'http://127.0.0.1:3001/api/health');
-  await waitForServer('Frontend UI', 'http://127.0.0.1:3000');
+  await waitForServer('Frontend UI', 'http://127.0.0.1:3005');
 
   console.log('\n====================================================');
   console.log('🎉 Agent HQ is LIVE!');
-  console.log('   Web UI:     http://localhost:3000');
+  console.log('   Web UI:     http://localhost:3005');
   console.log('   API & DB:   http://127.0.0.1:3001');
   console.log('====================================================');
   console.log('[3/3] Opening Agent HQ in your default browser...\n');
 
   if (isWin) {
-    exec('start http://localhost:3000');
+    exec('start http://localhost:3005');
   } else if (process.platform === 'darwin') {
-    exec('open http://localhost:3000');
+    exec('open http://localhost:3005');
   } else {
-    exec('xdg-open http://localhost:3000');
+    exec('xdg-open http://localhost:3005');
   }
 
   console.log('💡 Keep this window open while using Agent HQ. Press Ctrl+C to stop.');

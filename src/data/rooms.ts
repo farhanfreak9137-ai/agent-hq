@@ -14,10 +14,12 @@ export const ROOMS_DATA: RoomModel[] = [
     doorway: { x: 760, y: 300 },
     deskPositions: [
       { agentId: 'boss', pos: { x: 760, y: 155 }, facing: 'down' },
+      { agentId: 'strategist', pos: { x: 630, y: 155 }, facing: 'down' },
     ],
     props: [
       { id: 'p_boss_screen', type: 'hologram_table', x: 760, y: 205, width: 90, height: 40, glowColor: '#38bdf8' },
       { id: 'p_boss_desk', type: 'desk', x: 760, y: 130, width: 110, height: 45, glowColor: '#60a5fa' },
+      { id: 'p_strat_desk', type: 'desk', x: 630, y: 130, width: 80, height: 45, glowColor: '#c084fc' },
       { id: 'p_boss_plant_l', type: 'plant', x: 580, y: 80, width: 30, height: 30 },
       { id: 'p_boss_plant_r', type: 'plant', x: 940, y: 80, width: 30, height: 30 },
       { id: 'p_boss_shelf', type: 'bookshelf', x: 610, y: 70, width: 70, height: 30 },
@@ -103,11 +105,14 @@ export const ROOMS_DATA: RoomModel[] = [
     height: 250,
     colorTheme: '#06b6d4', // cyan
     doorway: { x: 760, y: 380 },
-    deskPositions: [],
+    deskPositions: [
+      { agentId: 'crm', pos: { x: 650, y: 490 }, facing: 'up' },
+      { agentId: 'outreach', pos: { x: 870, y: 490 }, facing: 'up' },
+    ],
     props: [
+      { id: 'p_crm_desk', type: 'desk', x: 650, y: 505, width: 80, height: 40, glowColor: '#34d399' },
+      { id: 'p_outreach_desk', type: 'desk', x: 870, y: 505, width: 80, height: 40, glowColor: '#38bdf8' },
       { id: 'p_lounge_table', type: 'coffee_table', x: 760, y: 505, width: 80, height: 50 },
-      { id: 'p_lounge_couch_l', type: 'couch', x: 670, y: 505, width: 40, height: 70 },
-      { id: 'p_lounge_couch_r', type: 'couch', x: 850, y: 505, width: 40, height: 70 },
       { id: 'p_lounge_water', type: 'water_cooler', x: 590, y: 410, width: 25, height: 40, glowColor: '#38bdf8' },
       { id: 'p_lounge_vending', type: 'vending_machine', x: 920, y: 410, width: 45, height: 60, glowColor: '#a855f7' },
       { id: 'p_lounge_plant_1', type: 'plant', x: 590, y: 590, width: 30, height: 30 },
@@ -185,24 +190,28 @@ export const ROOMS_DATA: RoomModel[] = [
     ],
   },
 
-  // 9. CORE SERVER DECK / DATA NEXUS (Bottom Center)
+  // 9. WRITER'S STUDY & ARCHIVE (QUILL)
   {
     id: 'room_core',
-    name: 'Quantum Core & Data Nexus',
-    type: 'command',
+    name: "Writer's Study & Archive",
+    type: 'research',
     x: 550,
     y: 710,
     width: 420,
     height: 250,
-    colorTheme: '#6366f1', // indigo
+    colorTheme: '#d97706', // warm amber / gold
     doorway: { x: 760, y: 710 },
-    deskPositions: [],
+    deskPositions: [
+      { agentId: 'quill', pos: { x: 760, y: 825 }, facing: 'up' },
+    ],
     props: [
-      { id: 'p_core_hologram', type: 'hologram_table', x: 760, y: 835, width: 100, height: 60, glowColor: '#818cf8' },
-      { id: 'p_core_servers_l', type: 'server_rack', x: 590, y: 750, width: 45, height: 160, glowColor: '#6366f1' },
-      { id: 'p_core_servers_r', type: 'server_rack', x: 925, y: 750, width: 45, height: 160, glowColor: '#818cf8' },
-      { id: 'p_core_plant_1', type: 'plant', x: 670, y: 740, width: 30, height: 30 },
-      { id: 'p_core_plant_2', type: 'plant', x: 850, y: 740, width: 30, height: 30 },
+      { id: 'p_quill_desk', type: 'desk', x: 760, y: 840, width: 110, height: 45, glowColor: '#f59e0b' },
+      { id: 'p_quill_monitors', type: 'dual_monitors', x: 760, y: 860, width: 75, height: 25, glowColor: '#fbbf24' },
+      { id: 'p_quill_shelf_l', type: 'bookshelf', x: 590, y: 740, width: 70, height: 30 },
+      { id: 'p_quill_shelf_r', type: 'bookshelf', x: 900, y: 740, width: 70, height: 30 },
+      { id: 'p_quill_couch', type: 'couch', x: 670, y: 890, width: 70, height: 35 },
+      { id: 'p_quill_plant_1', type: 'plant', x: 590, y: 890, width: 30, height: 30 },
+      { id: 'p_quill_plant_2', type: 'plant', x: 920, y: 890, width: 30, height: 30 },
     ],
   },
 ];

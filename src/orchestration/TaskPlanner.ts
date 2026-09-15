@@ -19,6 +19,10 @@ export class TaskPlanner {
     Reviewer: 'echo',
     Tester: 'vector',
     'Security Engineer': 'sentinel',
+    Writer: 'quill',
+    Strategist: 'strategist',
+    'CRM / Operations': 'crm',
+    Outreach: 'outreach',
   };
 
   /**
@@ -398,6 +402,243 @@ export class TaskPlanner {
     const needsSecurity = /security|audit|vulnerability|cve|auth|token|jwt|encryption|cipher|firewall|zero-trust|permission|sanitize|leak|exploit|penetration|secret/.test(fullText);
     const needsTesting = /test|testing|qa|fuzz|stress|e2e|unit|integration|coverage|chaos|benchmark|load|validate|regression/.test(fullText);
     const needsReview = /review|pr|pull request|inspect|gatekeeper|standards|compliance|quality|lint|verify/.test(fullText);
+    const needsProspecting = /prospect|prospecting|lead|leads|outreach|crm|client|clients|sales|opportunity|pipeline|customer|customers|pitch|business|businesses|qualif/.test(fullText);
+    const needsJobPipeline = /internship|job application|apply for|career opportunity|fellowship|job opening|hackathon application|scholarship application/.test(fullText) && !/client|sales|prospecting|lead generation/.test(fullText);
+
+    // If job / internship opportunity workflow is detected, construct the career application pipeline:
+    // ATLAS (Researcher) -> STRATEGIST (Profile Matcher) -> QUILL (Resume Customizer) -> OUTREACH (Application Drafter) -> ECHO (Reviewer) -> BOSS (Approval Gate)
+    if (needsJobPipeline) {
+      const rootId = 'node_career_scope_' + generateId('n');
+      graph.addNode({
+        id: rootId,
+        taskId: generateId('task'),
+        title: `Opportunity Mandate Scope: ${goal.substring(0, 36)}`,
+        description: `BOSS defines criteria, target roles, and requirements for career opportunity: ${description || goal}`,
+        assignedAgentId: 'boss',
+        dependencies: [],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 1,
+      });
+
+      const resId = 'node_career_res_' + generateId('n');
+      graph.addNode({
+        id: resId,
+        taskId: generateId('task'),
+        title: `Opportunity Discovery & Evidence Capture`,
+        description: `ATLAS gathers verified public opportunity specifications, source URLs, and eligibility rules without fabricating facts.`,
+        assignedAgentId: 'atlas',
+        dependencies: [rootId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+      graph.addEdge(rootId, resId);
+
+      const matchId = 'node_career_match_' + generateId('n');
+      graph.addNode({
+        id: matchId,
+        taskId: generateId('task'),
+        title: `Profile Requirement Matching & Evidence Synthesis`,
+        description: `STRATEGIST evaluates requirements against Farhan's Professional Profile, identifying strong matches, gaps, and project evidence.`,
+        assignedAgentId: 'strategist',
+        dependencies: [resId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+      graph.addEdge(resId, matchId);
+
+      const resumeId = 'node_career_res_cust_' + generateId('n');
+      graph.addNode({
+        id: resumeId,
+        taskId: generateId('task'),
+        title: `Tailor Resume from Verified Profile Facts`,
+        description: `QUILL tailors resume emphasizing verified skills and projects. Strict anti-fabrication: zero hallucinated credentials.`,
+        assignedAgentId: 'quill',
+        dependencies: [matchId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+      graph.addEdge(matchId, resumeId);
+
+      const draftId = 'node_career_draft_' + generateId('n');
+      graph.addNode({
+        id: draftId,
+        taskId: generateId('task'),
+        title: `Compose Application Message & Review Dossier`,
+        description: `OUTREACH drafts tailored cover letter and application dossier with missing information and potential risks flagged.`,
+        assignedAgentId: 'outreach',
+        dependencies: [resumeId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+      graph.addEdge(resumeId, draftId);
+
+      const revId = 'node_career_rev_' + generateId('n');
+      graph.addNode({
+        id: revId,
+        taskId: generateId('task'),
+        title: `Anti-Fabrication & Profile Integrity Audit`,
+        description: `ECHO audits application draft ensuring 100% factual accuracy against Farhan's authoritative profile facts.`,
+        assignedAgentId: 'echo',
+        dependencies: [draftId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 1,
+      });
+      graph.addEdge(draftId, revId);
+
+      const gateId = 'node_career_gate_' + generateId('n');
+      graph.addNode({
+        id: gateId,
+        taskId: generateId('task'),
+        title: `Application Review Dossier & Human Sign-Off Gate`,
+        description: `BOSS compiles final review dossier (Target, Source, Eligibility, Resume, Message, Risks) and halts for Farhan's approval.`,
+        assignedAgentId: 'boss',
+        dependencies: [revId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 1,
+      });
+      graph.addEdge(revId, gateId);
+
+      const validation = graph.validate();
+      if (!validation.valid) {
+        throw new Error(`Dynamic career DAG invalid: ${validation.errors.join('; ')}`);
+      }
+      return graph;
+    }
+
+    // If prospecting / business development workflow is detected, construct the canonical lead & outreach DAG:
+    // ATLAS (Researcher) -> STRATEGIST (Opportunity) -> CRM (Operations) -> OUTREACH (Drafter) -> ECHO (Reviewer) -> BOSS (Synthesis & Approval)
+    if (needsProspecting) {
+      const rootId = 'node_scope_' + generateId('n');
+
+      graph.addNode({
+        id: rootId,
+        taskId: generateId('task'),
+        title: `Prospecting Mandate & Territory Scope: ${goal.substring(0, 36)}`,
+        description: `BOSS formulates market targeting bounds, service capabilities, and qualification criteria for: ${description || goal}`,
+        assignedAgentId: 'boss',
+        dependencies: [],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 1,
+      });
+
+      // 1. Research (ATLAS)
+      const resId = 'node_research_' + generateId('n');
+      graph.addNode({
+        id: resId,
+        taskId: generateId('task'),
+        title: `Company & Infrastructure Intelligence Discovery`,
+        description: `ATLAS gathers verified public web data, tech stack clues, and organizational signals without fabricating facts.`,
+        assignedAgentId: 'atlas',
+        dependencies: [rootId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+      graph.addEdge(rootId, resId);
+
+      // 2. Strategist (STRATEGIST)
+      const stratId = 'node_strat_' + generateId('n');
+      graph.addNode({
+        id: stratId,
+        taskId: generateId('task'),
+        title: `Strategic Opportunity & Problem-Solution Fit Analysis`,
+        description: `STRATEGIST analyzes verified research, identifies operational friction points, maps to available services, and estimates project scope.`,
+        assignedAgentId: 'strategist',
+        dependencies: [resId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+      graph.addEdge(resId, stratId);
+
+      // 3. CRM Qualification (CRM)
+      const crmId = 'node_crm_' + generateId('n');
+      graph.addNode({
+        id: crmId,
+        taskId: generateId('task'),
+        title: `CRM Prospect Registration & Pipeline Qualification`,
+        description: `CRM verifies duplicate prevention, records prospect lifecycle state, and logs auditable interaction trail.`,
+        assignedAgentId: 'crm',
+        dependencies: [stratId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+      graph.addEdge(stratId, crmId);
+
+      // 4. Outreach Drafting (OUTREACH)
+      const outId = 'node_outreach_' + generateId('n');
+      graph.addNode({
+        id: outId,
+        taskId: generateId('task'),
+        title: `Generate Personalized Outreach Draft`,
+        description: `OUTREACH synthesizes concise, verified personalized draft based strictly on research and strategy. Sets requires_human_approval.`,
+        assignedAgentId: 'outreach',
+        dependencies: [crmId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+      graph.addEdge(crmId, outId);
+
+      // 5. Review & Fact-Check (ECHO)
+      const revId = 'node_review_' + generateId('n');
+      graph.addNode({
+        id: revId,
+        taskId: generateId('task'),
+        title: `Fact-Check & Anti-Hallucination Compliance Review`,
+        description: `ECHO audits outreach draft against verified research evidence to guarantee zero fabricated claims or spam-like rhetoric.`,
+        assignedAgentId: 'echo',
+        dependencies: [outId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 1,
+      });
+      graph.addEdge(outId, revId);
+
+      // 6. Executive Synthesis & Human Approval Gate (BOSS)
+      const synthId = 'node_synth_' + generateId('n');
+      graph.addNode({
+        id: synthId,
+        taskId: generateId('task'),
+        title: `Executive Pipeline Briefing & Human Authorization Gate`,
+        description: `BOSS compiles final prospect dossier and presents outreach for human operator sign-off before dispatch.`,
+        assignedAgentId: 'boss',
+        dependencies: [revId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 1,
+      });
+      graph.addEdge(revId, synthId);
+
+      const validation = graph.validate();
+      if (!validation.valid) {
+        throw new Error(`Prospecting DAG validation failed: ${validation.errors.join('; ')}`);
+      }
+      return graph;
+    }
 
     // If nothing specific matched, default to a balanced software development flow (Coding + Testing + Review)
     const hasAnySpecialist = needsResearch || needsDesign || needsCoding || needsSecurity || needsTesting || needsReview;

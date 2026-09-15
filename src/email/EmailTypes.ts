@@ -67,6 +67,34 @@ export const AGENT_DIRECTORY: Record<string, { name: string; role: string; email
     avatarColor: '#6366f1',
     symbol: '📝',
   },
+  quill: {
+    name: 'QUILL',
+    role: 'Lead Author & Literary Specialist',
+    email: 'quill.writer@agenthq.corp',
+    avatarColor: '#f59e0b',
+    symbol: '✍️',
+  },
+  strategist: {
+    name: 'STRATEGIST',
+    role: 'Lead Commercial & Technical Strategist',
+    email: 'strategist@agenthq.corp',
+    avatarColor: '#c084fc',
+    symbol: '🎯',
+  },
+  crm: {
+    name: 'CRM',
+    role: 'Pipeline Operations & CRM Director',
+    email: 'crm.ops@agenthq.corp',
+    avatarColor: '#34d399',
+    symbol: '📊',
+  },
+  outreach: {
+    name: 'OUTREACH',
+    role: 'Lead Outreach Specialist',
+    email: 'outreach@agenthq.corp',
+    avatarColor: '#38bdf8',
+    symbol: '✉️',
+  },
 };
 
 export const COMMANDER_EMAIL = 'commander@agenthq.corp';

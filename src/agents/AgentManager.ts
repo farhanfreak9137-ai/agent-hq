@@ -50,6 +50,12 @@ class AgentManagerClass {
               }
             });
             if (this.agents.size > 0) {
+              // Ensure any newly added initial agents (e.g. Quill) are incorporated
+              INITIAL_AGENTS.forEach((seed) => {
+                if (!this.agents.has(seed.id)) {
+                  this.agents.set(seed.id, { ...seed, currentPosition: { ...seed.deskPosition } });
+                }
+              });
               this.initRuntimes();
               return;
             }

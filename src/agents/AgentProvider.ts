@@ -140,6 +140,8 @@ export class MockAgentRuntime implements AgentRuntime {
         return 'testing';
       case 'Security Engineer':
         return 'security';
+      case 'Writer':
+        return 'writing';
       case 'Orchestrator':
       default:
         return 'orchestration';

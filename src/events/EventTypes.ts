@@ -56,7 +56,28 @@ export type SimulationEventType =
   | 'simulation.play'
   | 'simulation.pause'
   | 'simulation.speed'
-  | 'simulation.reset';
+  | 'simulation.reset'
+  | 'strategist.started'
+  | 'strategist.completed'
+  | 'strategist.failed'
+  | 'crm.prospect_created'
+  | 'crm.status_changed'
+  | 'crm.interaction_recorded'
+  | 'outreach.draft_created'
+  | 'outreach.reviewed'
+  | 'outreach.awaiting_approval'
+  | 'outreach.approved'
+  | 'outreach.rejected'
+  | 'profile.updated'
+  | 'profile.approval.requested'
+  | 'opportunity.discovered'
+  | 'opportunity.verified'
+  | 'opportunity.matched'
+  | 'application.drafted'
+  | 'application.approval.requested'
+  | 'application.approved'
+  | 'application.rejected'
+  | 'application.submitted';
 
 export interface BaseEvent {
   id: string;
@@ -441,6 +462,79 @@ export type SimulationEvent =
   | SimulationControlEvent
   | AgentEvent
   | TaskEvent
-  | MessageEvent
   | MissionEvent
+  | StrategistEvent
+  | CrmEvent
+  | OutreachEvent
   | BaseEvent;
+
+// --- Strategist, CRM & Outreach Specialized Events ---
+
+export interface StrategistEvent extends BaseEvent {
+  type: 'strategist.started' | 'strategist.completed' | 'strategist.failed';
+  agentId: string;
+  taskId?: string;
+  company?: string;
+  recommendation?: unknown;
+  error?: string;
+}
+
+export interface CrmEvent extends BaseEvent {
+  type: 'crm.prospect_created' | 'crm.status_changed' | 'crm.interaction_recorded';
+  agentId: string;
+  prospectId: string;
+  company: string;
+  previousStatus?: string;
+  currentStatus?: string;
+  interaction?: unknown;
+}
+
+export interface OutreachEvent extends BaseEvent {
+  type:
+    | 'outreach.draft_created'
+    | 'outreach.reviewed'
+    | 'outreach.awaiting_approval'
+    | 'outreach.approved'
+    | 'outreach.rejected';
+  agentId: string;
+  draftId: string;
+  recipient: string;
+  channel?: string;
+  draft?: unknown;
+  reason?: string;
+}
+
+// --- Farhan Professional Profile & Opportunity HQ Events ---
+
+export interface ProfileEvent extends BaseEvent {
+  type: 'profile.updated' | 'profile.approval.requested';
+  agentId?: string;
+  section?: string;
+  suggestionId?: string;
+  details?: unknown;
+}
+
+export interface OpportunityEvent extends BaseEvent {
+  type: 'opportunity.discovered' | 'opportunity.verified' | 'opportunity.matched';
+  opportunityId: string;
+  title: string;
+  organization: string;
+  agentId?: string;
+  fitAnalysis?: unknown;
+}
+
+export interface ApplicationEvent extends BaseEvent {
+  type:
+    | 'application.drafted'
+    | 'application.approval.requested'
+    | 'application.approved'
+    | 'application.rejected'
+    | 'application.submitted';
+  applicationId: string;
+  opportunityId: string;
+  targetOrganization: string;
+  agentId?: string;
+  decidedBy?: string;
+  rejectionReason?: string;
+}
+

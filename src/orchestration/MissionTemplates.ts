@@ -266,4 +266,153 @@ export const MISSION_TEMPLATES: Record<string, InitiativeDefinition> = {
       },
     ],
   },
+  lead_generation_outreach: {
+    id: 'tmpl_lead_generation_outreach',
+    title: 'Autonomous Lead Discovery, Strategy & Outreach Pipeline',
+    description: 'Autonomous multi-stage prospecting workflow: deep research, strategic opportunity evaluation, CRM tracking, personalized outreach drafting, and fact-checking peer review with human sign-off.',
+    goal: 'Identify verified business opportunities, record qualified prospects in CRM, and prepare personalized outreach drafts awaiting human approval.',
+    phases: [
+      {
+        name: 'Intelligence & Research',
+        tasks: [
+          {
+            id: 'task_lead_research',
+            title: 'Gather Verified Public Company & Tech Stack Data',
+            description: 'ATLAS aggregates verified public documentation, website structure, and market positioning without fabricating facts.',
+            role: 'Researcher',
+          },
+        ],
+      },
+      {
+        name: 'Strategic Opportunity Evaluation',
+        tasks: [
+          {
+            id: 'task_lead_strategy',
+            title: 'Evaluate Problem-Solution Fit & Service Scope',
+            description: 'STRATEGIST analyzes research findings, determines capability fit, estimates project scope, and formulates structured recommendation.',
+            role: 'Strategist',
+          },
+        ],
+      },
+      {
+        name: 'CRM Qualification & Pipeline Tracking',
+        tasks: [
+          {
+            id: 'task_lead_crm',
+            title: 'Record Qualified Prospect & Enforce State Transitions',
+            description: 'CRM verifies duplicate prevention, logs initial interaction, and transitions prospect to QUALIFIED lifecycle state.',
+            role: 'CRM / Operations',
+          },
+        ],
+      },
+      {
+        name: 'Personalized Outreach Drafting',
+        tasks: [
+          {
+            id: 'task_lead_outreach',
+            title: 'Generate Personalized Outreach Draft',
+            description: 'OUTREACH crafts concise, relevant message referencing verified research and strategist recommendation. Flags requires_human_approval.',
+            role: 'Outreach',
+          },
+        ],
+      },
+      {
+        name: 'Peer Review & Fact Checking',
+        tasks: [
+          {
+            id: 'task_lead_review',
+            title: 'Fact-Check Claims & Anti-Spam Compliance',
+            description: 'ECHO audits draft for accuracy against research evidence, ensuring no hallucinations or unauthorized claims.',
+            role: 'Reviewer',
+          },
+        ],
+      },
+      {
+        name: 'Executive Synthesis & Human Gate',
+        tasks: [
+          {
+            id: 'task_lead_synthesis',
+            title: 'Executive Mission Briefing & Approval Gate',
+            description: 'BOSS compiles synthesized dossier with verified deliverables and halts for human operator approval before dispatch.',
+            role: 'Orchestrator',
+          },
+        ],
+      },
+    ],
+  },
+  job_internship_pipeline: {
+    id: 'tmpl_job_internship_pipeline',
+    title: 'Professional Opportunity Discovery, Profile Matching & Application Pipeline',
+    description: 'Autonomous multi-stage career opportunity workflow: discover verified positions, match against Farhan\'s Professional Profile, tailor resume without hallucinations, compose application draft, and hold for human sign-off.',
+    goal: 'Discover verified engineering opportunities, match against Farhan\'s authoritative profile, generate tailored application package, and await human approval.',
+    phases: [
+      {
+        name: 'Opportunity Discovery & Evidence Capture',
+        tasks: [
+          {
+            id: 'task_opp_discovery',
+            title: 'Discover & Verify Legitimate Public Opportunities',
+            description: 'ATLAS aggregates verified public opportunities with source URLs, eligibility requirements, and deadlines without fabricating facts.',
+            role: 'Researcher',
+          },
+        ],
+      },
+      {
+        name: 'Profile Requirement Matching',
+        tasks: [
+          {
+            id: 'task_opp_matching',
+            title: 'Evaluate Profile-Opportunity Fit & Evidence',
+            description: 'STRATEGIST compares requirements against Farhan\'s Professional Profile, identifying strong matches, gaps, and project evidence.',
+            role: 'Strategist',
+          },
+        ],
+      },
+      {
+        name: 'Tailored Resume Customization',
+        tasks: [
+          {
+            id: 'task_opp_resume',
+            title: 'Generate Tailored Resume from Verified Profile Facts',
+            description: 'QUILL customizes resume emphasizing relevant verified skills and projects. Never invents technologies or metrics.',
+            role: 'Writer',
+          },
+        ],
+      },
+      {
+        name: 'Application Drafting & Review Dossier',
+        tasks: [
+          {
+            id: 'task_opp_draft',
+            title: 'Compose Application Message & Review Dossier',
+            description: 'OUTREACH synthesizes concise tailored application message and review dossier with missing info and potential risks. Flags requires_human_approval.',
+            role: 'Outreach',
+          },
+        ],
+      },
+      {
+        name: 'Anti-Fabrication & Fact Audit',
+        tasks: [
+          {
+            id: 'task_opp_fact_check',
+            title: 'Audit Claims & Verify Profile Alignment',
+            description: 'ECHO audits drafted application ensuring 100% factual accuracy against Farhan\'s profile with zero hallucinations.',
+            role: 'Reviewer',
+          },
+        ],
+      },
+      {
+        name: 'Executive Review & Human Approval Gate',
+        tasks: [
+          {
+            id: 'task_opp_approval_gate',
+            title: 'Present Application Review Gate & Halt for Human Approval',
+            description: 'BOSS compiles complete review dossier (Target, Source, Eligibility, Resume, Message, Risks) and halts for Farhan\'s explicit authorization.',
+            role: 'Orchestrator',
+          },
+        ],
+      },
+    ],
+  },
 };
+

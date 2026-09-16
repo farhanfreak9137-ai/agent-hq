@@ -10,6 +10,9 @@ import {
   Activity,
   Mail,
   ShieldCheck,
+  Compass,
+  Briefcase,
+  User,
 } from 'lucide-react';
 import { AgentModel, TaskModel, ProviderHealth } from '../types/index.ts';
 import { ProviderRegistry } from '../agents/ProviderRegistry.ts';
@@ -32,6 +35,9 @@ interface TopBarProps {
   onOpenTaskBoard: () => void;
   onOpenMissionDashboard?: () => void;
   onOpenInbox?: () => void;
+  onOpenOpportunityHQ?: () => void;
+  onOpenFarhanProfile?: () => void;
+  opportunityCount?: number;
   unreadEmailCount?: number;
   currentUser?: { username: string; role: string } | null;
   persistenceStatus?: string;
@@ -52,6 +58,9 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenTaskBoard,
   onOpenMissionDashboard,
   onOpenInbox,
+  onOpenOpportunityHQ,
+  onOpenFarhanProfile,
+  opportunityCount = 0,
   unreadEmailCount = 0,
   currentUser,
   persistenceStatus,
@@ -112,32 +121,27 @@ export const TopBar: React.FC<TopBarProps> = ({
 
       {/* Center Mission / Operational Status Capsule */}
       {activeMissionName ? (
-        <div className="flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-cyan-950/40 border border-cyan-500/40 animate-pulse">
-          <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-spin" style={{ animationDuration: '3s' }} />
-          <div className="flex items-center gap-2 text-xs font-mono">
-            <span className="font-bold text-cyan-300 uppercase tracking-wider text-[11px]">
+        <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-cyan-950/40 border border-cyan-500/30">
+          <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-spin" style={{ animationDuration: '4s' }} />
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-semibold text-cyan-300 text-[11px]">
               Step {activeMissionStep}/{totalMissionSteps}:
             </span>
             <span className="text-slate-200 truncate max-w-xs">{activeMissionName}</span>
           </div>
         </div>
       ) : (
-        <div className="hidden md:flex items-center gap-3 px-3.5 py-1 rounded-full bg-slate-900/80 border border-slate-800/80 text-[11px] font-mono text-slate-300 shadow-inner">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>
-              <strong className="text-white font-bold">{activeAgentsCount}</strong>/{agents.length} Active
-            </span>
-          </div>
-          <span className="text-slate-700">|</span>
-          <span>
-            <strong className="text-white font-bold">{activeTasksCount}</strong> Active Tasks
+        <div className="hidden md:flex items-center gap-2.5 px-3 py-1 rounded-full bg-slate-900/60 border border-slate-800/60 text-xs text-slate-300">
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span className="font-medium text-slate-200">
+            {activeAgentsCount > 0 ? `${activeAgentsCount} of ${agents.length} active` : 'All agents ready'}
           </span>
-          <span className="text-slate-700">|</span>
-          <div className="flex items-center gap-1 text-cyan-400">
-            <ShieldCheck className="w-3 h-3 text-purple-400" />
-            <span>AI Cascade (Gemini + AGY)</span>
-          </div>
+          {activeTasksCount > 0 && (
+            <>
+              <span className="text-slate-600">•</span>
+              <span className="text-slate-400">{activeTasksCount} {activeTasksCount === 1 ? 'task' : 'tasks'} running</span>
+            </>
+          )}
         </div>
       )}
 
@@ -222,13 +226,42 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
         )}
 
-        {/* Primary Create Task Button (BOSS Orchestrator & Worker Dispatch) */}
+        {/* Farhan Authoritative Profile Button */}
+        {onOpenFarhanProfile && (
+          <button
+            onClick={onOpenFarhanProfile}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-medium transition cursor-pointer"
+            title="Farhan Authoritative Professional Profile"
+          >
+            <User className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Farhan Profile</span>
+          </button>
+        )}
+
+        {/* Opportunity HQ Button with Badge */}
+        {onOpenOpportunityHQ && (
+          <button
+            onClick={onOpenOpportunityHQ}
+            className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-700/60 text-xs font-medium transition cursor-pointer"
+            title="Opportunity HQ (Discovered, Verified & Matched Opportunities)"
+          >
+            <Briefcase className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Opportunities</span>
+            {opportunityCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] font-bold">
+                {opportunityCount}
+              </span>
+            )}
+          </button>
+        )}
+
+        {/* Primary Create Task Button */}
         <button
           onClick={onOpenCreateTask}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-amber-500 via-indigo-600 to-cyan-500 hover:from-amber-400 hover:to-cyan-400 shadow-lg shadow-indigo-500/20 border border-amber-400/40 cursor-pointer active:scale-95 transition"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-cyan-600 hover:bg-cyan-500 shadow-md shadow-cyan-600/20 border border-cyan-400/40 cursor-pointer active:scale-95 transition"
         >
-          <Sparkles className="w-3.5 h-3.5 text-amber-200" />
-          <span>+ Create Task</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>New Task</span>
         </button>
       </div>
     </header>

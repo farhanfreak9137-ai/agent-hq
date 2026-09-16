@@ -248,29 +248,82 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({ isOpen, onCl
                 Human Approval Required ({pendingApprovals.length} pending action)
               </span>
             </div>
-            {pendingApprovals.map((req) => (
-              <div key={req.id} className="flex items-center justify-between bg-slate-900/90 p-2.5 rounded-lg border border-purple-800/50 text-xs">
-                <div>
-                  <span className="font-semibold text-white">{req.agentId.toUpperCase()}</span> requests restricted tool:{' '}
-                  <span className="text-purple-300 font-mono font-bold">[{req.toolName}]</span>
-                  <div className="text-[11px] text-slate-400 mt-0.5">{req.reason}</div>
+            {pendingApprovals.map((req) => {
+              const p = req.parameters || {};
+              const company = (p.company as string) || (p.recipient as string);
+              const opp = p.opportunity as string;
+              const service = p.recommendedService as string;
+              const subject = p.subject as string;
+              const body = p.body as string;
+              const isOutreach = req.toolId.includes('outreach') || !!subject || !!body;
+
+              return (
+                <div key={req.id} className="flex flex-col gap-2 bg-slate-900/95 p-3 rounded-xl border border-purple-800/60 text-xs shadow-lg">
+                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold tracking-wider text-[10px] uppercase">
+                        Awaiting Farhan's Approval
+                      </span>
+                      <span className="text-slate-300 font-semibold">{req.agentId.toUpperCase()}</span>
+                      <span className="text-purple-400 font-mono font-bold">[{req.toolName}]</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleApprove(req.id)}
+                        className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow transition cursor-pointer"
+                      >
+                        APPROVE
+                      </button>
+                      <button
+                        onClick={() => handleReject(req.id)}
+                        className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow transition cursor-pointer"
+                      >
+                        REJECT
+                      </button>
+                    </div>
+                  </div>
+
+                  {isOutreach ? (
+                    <div className="space-y-1.5 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800 text-[11px]">
+                      {company && (
+                        <div>
+                          <span className="text-slate-400 font-medium">Company:</span>{' '}
+                          <span className="text-white font-semibold">{company}</span>
+                        </div>
+                      )}
+                      {opp && (
+                        <div>
+                          <span className="text-slate-400 font-medium">Opportunity:</span>{' '}
+                          <span className="text-purple-300 font-semibold">{opp}</span>
+                        </div>
+                      )}
+                      {service && (
+                        <div>
+                          <span className="text-slate-400 font-medium">Recommended Service:</span>{' '}
+                          <span className="text-emerald-300 font-semibold">{service}</span>
+                        </div>
+                      )}
+                      {subject && (
+                        <div>
+                          <span className="text-slate-400 font-medium">Subject:</span>{' '}
+                          <span className="text-sky-300 font-semibold">{subject}</span>
+                        </div>
+                      )}
+                      {body && (
+                        <div className="mt-1 pt-1 border-t border-slate-800/80">
+                          <span className="text-slate-400 font-medium block mb-1">Generated Email Draft:</span>
+                          <pre className="whitespace-pre-wrap font-sans text-slate-200 bg-slate-900/80 p-2.5 rounded border border-slate-800/50 leading-relaxed text-[11px]">
+                            {body}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-slate-400">{req.reason}</div>
+                  )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleApprove(req.id)}
-                    className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow"
-                  >
-                    Authorize
-                  </button>
-                  <button
-                    onClick={() => handleReject(req.id)}
-                    className="px-3 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-medium shadow"
-                  >
-                    Reject
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

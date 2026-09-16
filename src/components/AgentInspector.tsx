@@ -24,7 +24,7 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
   camera,
   simulationEngine,
 }) => {
-  const [activeTab, setActiveTab] = useState<'details' | 'tasks' | 'messages' | 'runtime' | 'artifacts'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'messages' | 'advanced'>('details');
   const [quickMsg, setQuickMsg] = useState('');
   const [, setTick] = useState(0);
 
@@ -130,7 +130,7 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
         </button>
       </div>
 
-      {/* Tabs */}
+      {/* Simplified Tabs */}
       <div className="flex border-b border-slate-800 bg-slate-900/40 text-xs font-medium text-slate-400">
         <button
           onClick={() => setActiveTab('details')}
@@ -140,17 +140,7 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
               : 'border-transparent hover:text-slate-200'
           }`}
         >
-          Overview
-        </button>
-        <button
-          onClick={() => setActiveTab('tasks')}
-          className={`flex-1 py-2.5 text-center border-b-2 transition ${
-            activeTab === 'tasks'
-              ? 'border-cyan-400 text-cyan-300 font-semibold'
-              : 'border-transparent hover:text-slate-200'
-          }`}
-        >
-          Tasks ({agentTasks.length})
+          Overview & Work
         </button>
         <button
           onClick={() => setActiveTab('messages')}
@@ -160,27 +150,17 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
               : 'border-transparent hover:text-slate-200'
           }`}
         >
-          Comms ({recentMessages.length})
+          Messages {recentMessages.length > 0 && `(${recentMessages.length})`}
         </button>
         <button
-          onClick={() => setActiveTab('runtime')}
+          onClick={() => setActiveTab('advanced')}
           className={`flex-1 py-2.5 text-center border-b-2 transition ${
-            activeTab === 'runtime'
+            activeTab === 'advanced'
               ? 'border-cyan-400 text-cyan-300 font-semibold'
               : 'border-transparent hover:text-slate-200'
           }`}
         >
-          Runtime
-        </button>
-        <button
-          onClick={() => setActiveTab('artifacts')}
-          className={`flex-1 py-2.5 text-center border-b-2 transition ${
-            activeTab === 'artifacts'
-              ? 'border-cyan-400 text-cyan-300 font-semibold'
-              : 'border-transparent hover:text-slate-200'
-          }`}
-        >
-          Artifacts ({agentArtifacts.length})
+          Advanced
         </button>
       </div>
 
@@ -280,50 +260,66 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
               </div>
             </div>
 
-            {/* Operational Stats Grid */}
-            <div className="space-y-2">
+            {/* Finished Work / Output */}
+            {agentArtifacts.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                  <span>Finished Work</span>
+                  <span className="text-[10px] font-mono text-cyan-400 font-normal">({agentArtifacts.length})</span>
+                </h4>
+                <div className="space-y-2">
+                  {agentArtifacts.map((art) => (
+                    <div
+                      key={art.id}
+                      className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs space-y-1"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-cyan-300">{art.title}</span>
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-slate-800 text-cyan-400 uppercase font-bold">
+                          {art.type}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-300 bg-slate-950/60 p-2 rounded border border-slate-800/60 whitespace-pre-wrap max-h-32 overflow-y-auto font-mono text-[10px] leading-relaxed">
+                        {art.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Simple Activity Stats */}
+            <div className="space-y-1.5">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Performance Telemetry
+                Activity
               </h4>
-              <div className="grid grid-cols-2 gap-2 font-mono text-xs">
-                <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 text-[10px] block">TASKS COMPLETED</span>
-                  <strong className="text-sm text-emerald-400 font-bold">
-                    {agent.stats.tasksCompleted}
-                  </strong>
+              <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
+                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                  <span className="text-slate-500 text-[9px] block uppercase">Tasks Done</span>
+                  <strong className="text-emerald-400 font-bold">{agent.stats.tasksCompleted}</strong>
                 </div>
-                <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 text-[10px] block">MESSAGES SENT</span>
-                  <strong className="text-sm text-cyan-400 font-bold">
-                    {agent.stats.messagesSent}
-                  </strong>
+                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                  <span className="text-slate-500 text-[9px] block uppercase">Messages</span>
+                  <strong className="text-cyan-400 font-bold">{agent.stats.messagesSent}</strong>
                 </div>
-                <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 text-[10px] block">LINES / AUDITS</span>
-                  <strong className="text-sm text-purple-400 font-bold">
-                    {agent.stats.linesOfCodeOrReviews.toLocaleString()}
-                  </strong>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 text-[10px] block">UPTIME</span>
-                  <strong className="text-sm text-slate-200 font-bold">
-                    {Math.floor(agent.stats.uptimeSeconds / 60)}m
-                  </strong>
+                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                  <span className="text-slate-500 text-[9px] block uppercase">Active Time</span>
+                  <strong className="text-slate-200 font-bold">{Math.floor(agent.stats.uptimeSeconds / 60)}m</strong>
                 </div>
               </div>
             </div>
 
-            {/* Quick Dispatch Message Form */}
+            {/* Quick Message Form */}
             <form onSubmit={handleSendQuickMessage} className="pt-2">
               <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                Dispatch In-World Broadcast
+                Send Direct Message
               </label>
               <div className="flex gap-1.5">
                 <input
                   type="text"
                   value={quickMsg}
                   onChange={(e) => setQuickMsg(e.target.value)}
-                  placeholder={`Send simulated message from ${agent.name}...`}
+                  placeholder={`Send message to ${agent.name}...`}
                   className="flex-1 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
                 />
                 <button
@@ -335,35 +331,6 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
               </div>
             </form>
           </>
-        )}
-
-        {activeTab === 'tasks' && (
-          <div className="space-y-2">
-            {agentTasks.length === 0 ? (
-              <div className="text-center py-10 text-slate-600 text-xs">No tasks recorded.</div>
-            ) : (
-              agentTasks.map((t) => (
-                <div
-                  key={t.id}
-                  className="p-3 rounded-lg bg-slate-900/70 border border-slate-800 space-y-1.5"
-                >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-200">{t.title}</span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300">
-                      {t.status}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400">{t.description}</p>
-                  <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-cyan-400"
-                      style={{ width: `${t.progress}%` }}
-                    />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
         )}
 
         {activeTab === 'messages' && (
@@ -389,40 +356,31 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
           </div>
         )}
 
-        {activeTab === 'runtime' && (
+        {activeTab === 'advanced' && (
           <div className="space-y-4">
-            {/* Runtime Lifecycle Status Card */}
+            {/* AI Provider Status */}
             <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-slate-300 flex items-center gap-1.5">
                   <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-                  Runtime Lifecycle Status
+                  AI Provider Engine
                 </span>
                 <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border uppercase font-bold ${getStatusBadge(runtimeStatus)}`}>
                   {runtimeStatus}
                 </span>
               </div>
-              <div className="text-[11px] text-slate-400 space-y-1">
+              <div className="text-[11px] text-slate-400 space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span>Assigned Provider:</span>
-                  <div className="flex items-center gap-1.5">
-                    <select
-                      value={agent.providerId || 'mock'}
-                      onChange={(e) => AgentManager.setAgentProvider(agent.id, e.target.value)}
-                      className="px-2 py-0.5 rounded bg-slate-950 border border-slate-700 text-cyan-300 font-mono text-[10px] uppercase font-bold focus:outline-none focus:border-cyan-500 cursor-pointer"
-                    >
-                      <option value="antigravity">Antigravity (agy)</option>
-                      <option value="gemini">Gemini API</option>
-                      <option value="mock">Local Engine</option>
-                    </select>
-                    <span className={`px-1.5 py-0.5 rounded font-mono text-[9px] uppercase font-bold ${
-                      agent.providerId === 'mock' || !agent.providerId
-                        ? 'bg-slate-800 text-slate-400 border border-slate-700'
-                        : 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/60'
-                    }`}>
-                      {agent.providerId === 'mock' || !agent.providerId ? 'MOCK' : 'EXTERNAL'}
-                    </span>
-                  </div>
+                  <span>Provider:</span>
+                  <select
+                    value={agent.providerId || 'mock'}
+                    onChange={(e) => AgentManager.setAgentProvider(agent.id, e.target.value)}
+                    className="px-2 py-0.5 rounded bg-slate-950 border border-slate-700 text-cyan-300 font-mono text-[10px] uppercase font-bold focus:outline-none focus:border-cyan-500 cursor-pointer"
+                  >
+                    <option value="antigravity">Antigravity (agy)</option>
+                    <option value="gemini">Gemini API</option>
+                    <option value="mock">Local Engine</option>
+                  </select>
                 </div>
                 {agent.systemRole && (
                   <div className="text-[11px] text-slate-300 bg-slate-950/40 p-1.5 rounded border border-slate-800/60">
@@ -442,7 +400,7 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
             <div className="space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                 <Wrench className="w-3.5 h-3.5 text-amber-400" />
-                Available Simulated Tools
+                Available Tools
               </h4>
               <div className="space-y-1.5">
                 {tools.length === 0 ? (
@@ -466,16 +424,16 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
               </div>
             </div>
 
-            {/* In-Memory Session Storage */}
+            {/* Diagnostic Session Notes */}
             <div className="space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                 <Database className="w-3.5 h-3.5 text-emerald-400" />
-                Recent Agent Memory (Session)
+                Session Notes & Memory
               </h4>
               <div className="space-y-1.5 font-mono text-xs">
                 {runtimeMemories.length === 0 ? (
                   <div className="text-center py-6 text-slate-600 text-xs">
-                    No runtime memory recorded yet this session.
+                    No session notes recorded yet.
                   </div>
                 ) : (
                   runtimeMemories.map((entry) => (
@@ -497,39 +455,6 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
                 )}
               </div>
             </div>
-          </div>
-        )}
-
-        {activeTab === 'artifacts' && (
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Deliverable Artifacts ({agentArtifacts.length})
-            </h4>
-            {agentArtifacts.length === 0 ? (
-              <div className="text-center py-10 text-slate-600 text-xs">
-                No verifiable deliverables generated by this agent yet.
-              </div>
-            ) : (
-              agentArtifacts.map((art) => (
-                <div
-                  key={art.id}
-                  className="p-3 rounded-lg bg-slate-900/70 border border-slate-800 space-y-1.5 text-xs"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-cyan-300">{art.title}</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-cyan-400 uppercase">
-                      {art.type}
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-slate-500 font-mono">
-                    Created {new Date(art.createdAt).toLocaleTimeString()}
-                  </div>
-                  <div className="text-[11px] text-slate-300 bg-slate-950/70 p-2.5 rounded border border-slate-800/80 font-mono whitespace-pre-wrap max-h-40 overflow-y-auto leading-relaxed">
-                    {art.content}
-                  </div>
-                </div>
-              ))
-            )}
           </div>
         )}
       </div>

@@ -22,7 +22,7 @@ interface ActivityFeedProps {
 
 export const ActivityFeed: React.FC<ActivityFeedProps> = ({ onFocusAgentById }) => {
   const [events, setEvents] = useState<SimulationEvent[]>([]);
-  const [isExpanded, setIsExpanded] = useState<boolean>(true);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [filter, setFilter] = useState<'all' | 'runtime' | 'task' | 'message' | 'mission'>('all');
   const scrollRef = useRef<HTMLDivElement | null>(null);
 

@@ -1222,5 +1222,498 @@ Produce a structured JSON response with:
     res.status(201).json(created);
   });
 
+  // ----------------------------------------------------
+  // 13. CRM Prospects Endpoints
+  // ----------------------------------------------------
+
+  router.get('/prospects', (req: Request, res: Response) => {
+    const status = req.query.status as any;
+    const limit = Number(req.query.limit) || 100;
+    res.json(repos.prospects.findAll({ status, limit }));
+  });
+
+  router.get('/prospects/:id', (req: Request, res: Response) => {
+    const prospect = repos.prospects.findById(req.params.id);
+    if (!prospect) return res.status(404).json({ error: 'Prospect not found.' });
+    res.json(prospect);
+  });
+
+  router.post('/prospects', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const { company, domain, contactName, contactEmail, opportunity, recommendedService, fit, priority, researchNotes, metadata } = req.body;
+    if (!company) {
+      return res.status(400).json({ error: 'Company name is required.' });
+    }
+
+    // Check for duplicate
+    const existing = repos.prospects.checkDuplicate(company, domain);
+    if (existing) {
+      return res.status(409).json({
+        error: `Prospect "${company}" already exists in CRM.`,
+        prospect: existing,
+        isDuplicate: true,
+      });
+    }
+
+    const prospectId = `prospect_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const created = repos.prospects.create({
+      id: prospectId,
+      company: company.trim(),
+      domain: domain ? domain.trim() : undefined,
+      contactName,
+      contactEmail,
+      status: 'DISCOVERED',
+      opportunity,
+      recommendedService,
+      fit: fit || 'medium',
+      priority: priority || 'medium',
+      researchNotes: researchNotes || [],
+      interactions: [
+        {
+          id: `int_${Date.now()}_init`,
+          timestamp: Date.now(),
+          type: 'opportunity_identified',
+          summary: `Prospect discovered and registered in CRM.`,
+          actorAgentId: 'crm',
+          details: { opportunity, recommendedService },
+        },
+      ],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata,
+    });
+
+    eventStream.broadcast({
+      id: `ev_crm_${created.id}`,
+      type: 'crm.prospect_created',
+      timestamp: Date.now(),
+      message: `New prospect recorded: ${created.company} (Status: ${created.status})`,
+      agent_id: 'crm',
+      task_id: null,
+      mission_id: null,
+      metadata: { prospectId: created.id, company: created.company },
+    });
+
+    res.status(201).json(created);
+  });
+
+  router.patch('/prospects/:id/status', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const { status, actorAgentId, note } = req.body;
+    if (!status) {
+      return res.status(400).json({ error: 'New status is required.' });
+    }
+
+    const result = repos.prospects.transitionStatus(req.params.id, status, actorAgentId || 'crm', note);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    eventStream.broadcast({
+      id: `ev_crm_status_${req.params.id}`,
+      type: 'crm.status_changed',
+      timestamp: Date.now(),
+      message: `Prospect ${result.prospect?.company} transitioned to ${status}`,
+      agent_id: actorAgentId || 'crm',
+      task_id: null,
+      mission_id: null,
+      metadata: { prospectId: req.params.id, newStatus: status, note },
+    });
+
+    res.json(result.prospect);
+  });
+
+  router.post('/prospects/:id/interactions', (req: Request, res: Response) => {
+    const { type, summary, actorAgentId, details } = req.body;
+    if (!type || !summary) {
+      return res.status(400).json({ error: 'Interaction type and summary required.' });
+    }
+
+    const updated = repos.prospects.recordInteraction(req.params.id, {
+      type,
+      summary,
+      actorAgentId: actorAgentId || 'crm',
+      details,
+    });
+
+    if (!updated) return res.status(404).json({ error: 'Prospect not found.' });
+
+    eventStream.broadcast({
+      id: `ev_crm_int_${Date.now()}`,
+      type: 'crm.interaction_recorded',
+      timestamp: Date.now(),
+      message: `Interaction recorded for ${updated.company}: ${summary}`,
+      agent_id: actorAgentId || 'crm',
+      task_id: null,
+      mission_id: null,
+      metadata: { prospectId: updated.id, type },
+    });
+
+    res.json(updated);
+  });
+
+  // ----------------------------------------------------
+  // 14. Outreach Drafts Endpoints (STRICT APPROVAL GATED)
+  // ----------------------------------------------------
+
+  router.get('/outreach/drafts', (req: Request, res: Response) => {
+    const status = req.query.status as string | undefined;
+    const limit = Number(req.query.limit) || 100;
+    res.json(repos.outreachDrafts.findAll({ status, limit }));
+  });
+
+  router.get('/outreach/drafts/:id', (req: Request, res: Response) => {
+    const draft = repos.outreachDrafts.findById(req.params.id);
+    if (!draft) return res.status(404).json({ error: 'Outreach draft not found.' });
+    res.json(draft);
+  });
+
+  router.post('/outreach/drafts', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const { prospectId, company, recipient, channel, subject, body, personalization_points, source_evidence, confidence } = req.body;
+
+    if (!recipient || !subject || !body) {
+      return res.status(400).json({ error: 'Recipient, subject, and body are required.' });
+    }
+
+    const draftId = `draft_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const created = repos.outreachDrafts.create({
+      id: draftId,
+      prospectId,
+      company,
+      recipient,
+      channel: channel || 'email',
+      subject,
+      body,
+      personalization_points: personalization_points || [],
+      source_evidence: source_evidence || [],
+      confidence: confidence ?? 0.9,
+      requires_human_approval: true,
+      status: 'AWAITING_HUMAN_APPROVAL',
+      createdAt: Date.now(),
+    });
+
+    // Link draft to prospect if provided
+    if (prospectId) {
+      repos.prospects.update(prospectId, { draftId: created.id });
+      repos.prospects.transitionStatus(prospectId, 'DRAFTED', 'outreach', 'Outreach draft prepared.');
+    }
+
+    eventStream.broadcast({
+      id: `ev_outreach_draft_${created.id}`,
+      type: 'outreach.draft_created',
+      timestamp: Date.now(),
+      message: `Outreach draft created for ${recipient} (${subject}). Status: AWAITING_HUMAN_APPROVAL`,
+      agent_id: 'outreach',
+      task_id: null,
+      mission_id: null,
+      metadata: { draftId: created.id, recipient, subject },
+    });
+
+    res.status(201).json(created);
+  });
+
+  router.post('/outreach/drafts/:id/approve', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const operator = req.user?.username || 'human_operator';
+    const approved = repos.outreachDrafts.approve(req.params.id, operator);
+    if (!approved) return res.status(404).json({ error: 'Draft not found.' });
+
+    if (approved.prospectId) {
+      repos.prospects.transitionStatus(approved.prospectId, 'APPROVED', 'human', `Approved by ${operator}`);
+    }
+
+    eventStream.broadcast({
+      id: `ev_outreach_appr_${approved.id}`,
+      type: 'outreach.approved',
+      timestamp: Date.now(),
+      message: `Outreach draft ${approved.id} APPROVED by ${operator}`,
+      agent_id: 'human',
+      task_id: null,
+      mission_id: null,
+      metadata: { draftId: approved.id, approvedBy: operator },
+    });
+
+    res.json({ success: true, draft: approved });
+  });
+
+  router.post('/outreach/drafts/:id/reject', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const operator = req.user?.username || 'human_operator';
+    const reason = req.body.reason || 'Rejected by operator';
+    const rejected = repos.outreachDrafts.reject(req.params.id, reason, operator);
+    if (!rejected) return res.status(404).json({ error: 'Draft not found.' });
+
+    eventStream.broadcast({
+      id: `ev_outreach_rej_${rejected.id}`,
+      type: 'outreach.rejected',
+      timestamp: Date.now(),
+      message: `Outreach draft ${rejected.id} REJECTED: ${reason}`,
+      agent_id: 'human',
+      task_id: null,
+      mission_id: null,
+      metadata: { draftId: rejected.id, reason },
+    });
+
+    res.json({ success: true, draft: rejected });
+  });
+
+  // Physically dispatch/send outreach ONLY IF EXPLICITLY APPROVED
+  router.post('/outreach/drafts/:id/send', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const result = repos.outreachDrafts.markSent(req.params.id);
+    if (!result.success) {
+      return res.status(403).json({ error: result.error });
+    }
+
+    const draft = result.draft!;
+    if (draft.prospectId) {
+      repos.prospects.transitionStatus(draft.prospectId, 'CONTACTED', 'outreach', `Sent email to ${draft.recipient}`);
+      repos.prospects.recordInteraction(draft.prospectId, {
+        type: 'contacted',
+        summary: `Sent outreach email: "${draft.subject}" to ${draft.recipient}`,
+        actorAgentId: 'outreach',
+        details: { draftId: draft.id, channel: draft.channel },
+      });
+    }
+
+    eventStream.broadcast({
+      id: `ev_outreach_sent_${draft.id}`,
+      type: 'agent.message_sent',
+      timestamp: Date.now(),
+      message: `OUTREACH DISPATCHED: Email sent to ${draft.recipient}`,
+      agent_id: 'outreach',
+      task_id: null,
+      mission_id: null,
+      metadata: { draftId: draft.id, recipient: draft.recipient },
+    });
+
+    res.json({ success: true, message: 'Outreach dispatched successfully.', draft });
+  });
+
+  // ----------------------------------------------------
+  // 9. Farhan Professional Profile Endpoints
+  // ----------------------------------------------------
+
+  router.get('/profile', (_req: Request, res: Response) => {
+    const scope = (_req.query.scope as any) || 'FULL';
+    const profile = repos.profile.get(scope);
+    if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+    res.json(profile);
+  });
+
+  router.put('/profile', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const result = repos.profile.updateAuthoritative(req.body, {
+      isUser: true,
+      actorId: req.user?.username || 'Farhan',
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    eventStream.broadcast({
+      id: `ev_prof_upd_${Date.now()}`,
+      type: 'agent.state_changed',
+      timestamp: Date.now(),
+      message: 'Farhan Professional Profile updated.',
+      agent_id: 'system',
+      task_id: null,
+      mission_id: null,
+      metadata: { version: result.profile?.version },
+    });
+
+    res.json({ success: true, profile: result.profile });
+  });
+
+  router.post('/profile/suggest', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const { agentId, reason, section, proposedChange } = req.body;
+    if (!agentId || !reason || !section || !proposedChange) {
+      return res.status(400).json({ error: 'agentId, reason, section, and proposedChange are required.' });
+    }
+
+    const suggestion = repos.profile.createSuggestion({
+      agentId,
+      reason,
+      section,
+      proposedChange,
+    });
+
+    eventStream.broadcast({
+      id: `ev_sug_${suggestion.id}`,
+      type: 'agent.state_changed',
+      timestamp: Date.now(),
+      message: `Profile suggestion from ${agentId}: ${reason}`,
+      agent_id: agentId,
+      task_id: null,
+      mission_id: null,
+      metadata: { suggestionId: suggestion.id, section },
+    });
+
+    res.json({ success: true, suggestion });
+  });
+
+  router.get('/profile/suggestions', (req: Request, res: Response) => {
+    const status = req.query.status as string | undefined;
+    res.json(repos.profile.getSuggestions(status));
+  });
+
+  router.post('/profile/suggestions/:id/approve', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const approvedBy = req.user?.username || 'Farhan';
+    const result = repos.profile.approveSuggestion(req.params.id, approvedBy);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json({ success: true, profile: result.profile });
+  });
+
+  router.post('/profile/suggestions/:id/reject', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const rejectedBy = req.user?.username || 'Farhan';
+    const result = repos.profile.rejectSuggestion(req.params.id, rejectedBy);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json({ success: true, message: 'Suggestion rejected.' });
+  });
+
+  // ----------------------------------------------------
+  // 10. Opportunity HQ Endpoints
+  // ----------------------------------------------------
+
+  router.get('/opportunities', (req: Request, res: Response) => {
+    const { type, status, remote, limit } = req.query;
+    const opportunities = repos.opportunities.findAll({
+      type: type as any,
+      status: status as any,
+      remote: remote !== undefined ? remote === 'true' || remote === '1' : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+    res.json(opportunities);
+  });
+
+  router.get('/opportunities/:id', (req: Request, res: Response) => {
+    const opp = repos.opportunities.findById(req.params.id);
+    if (!opp) return res.status(404).json({ error: 'Opportunity not found.' });
+    res.json(opp);
+  });
+
+  router.post('/opportunities', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const result = repos.opportunities.create(req.body);
+    if (!result.success && result.isDuplicate) {
+      return res.status(409).json({ error: result.error, opportunity: result.opportunity, isDuplicate: true });
+    }
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.status(201).json(result.opportunity);
+  });
+
+  router.patch('/opportunities/:id', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const updated = repos.opportunities.update(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: 'Opportunity not found.' });
+    res.json(updated);
+  });
+
+  router.patch('/opportunities/:id/status', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const { status, note } = req.body;
+    if (!status) return res.status(400).json({ error: 'status is required.' });
+
+    const result = repos.opportunities.transitionStatus(
+      req.params.id,
+      status,
+      req.user?.username || 'system',
+      note
+    );
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json({ success: true, opportunity: result.opportunity });
+  });
+
+  router.delete('/opportunities/:id', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const deleted = repos.opportunities.delete(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Opportunity not found.' });
+    res.json({ success: true, message: 'Opportunity deleted.' });
+  });
+
+  // ----------------------------------------------------
+  // 11. Tailored Job Application Endpoints
+  // ----------------------------------------------------
+
+  router.get('/applications', (req: Request, res: Response) => {
+    const status = req.query.status as string | undefined;
+    res.json(repos.jobApplications.findAll(status));
+  });
+
+  router.get('/applications/:id', (req: Request, res: Response) => {
+    const app = repos.jobApplications.findById(req.params.id);
+    if (!app) return res.status(404).json({ error: 'Application not found.' });
+    res.json(app);
+  });
+
+  router.get('/applications/opportunity/:oppId', (req: Request, res: Response) => {
+    const app = repos.jobApplications.findByOpportunityId(req.params.oppId);
+    if (!app) return res.status(404).json({ error: 'Application not found for opportunity.' });
+    res.json(app);
+  });
+
+  router.post('/applications', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const app = repos.jobApplications.create(req.body);
+    if (app.opportunityId) {
+      repos.opportunities.update(app.opportunityId, {
+        applicationDraftId: app.id,
+        status: 'APPLICATION_DRAFTED',
+      });
+    }
+    res.status(201).json(app);
+  });
+
+  router.post('/applications/:id/approve', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const approvedBy = req.user?.username || 'Farhan';
+    const result = repos.jobApplications.approve(req.params.id, approvedBy);
+    if (!result.success) return res.status(400).json({ error: result.error });
+
+    if (result.application?.opportunityId) {
+      repos.opportunities.transitionStatus(result.application.opportunityId, 'AWAITING_APPROVAL', approvedBy, 'Application approved for submission');
+    }
+
+    res.json({ success: true, application: result.application });
+  });
+
+  router.post('/applications/:id/reject', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const { reason } = req.body;
+    const rejectedBy = req.user?.username || 'Farhan';
+    const result = repos.jobApplications.reject(req.params.id, reason || 'Rejected by operator', rejectedBy);
+    if (!result.success) return res.status(400).json({ error: result.error });
+
+    if (result.application?.opportunityId) {
+      repos.opportunities.transitionStatus(result.application.opportunityId, 'REJECTED', rejectedBy, reason);
+    }
+
+    res.json({ success: true, application: result.application });
+  });
+
+  // Physical submission gate: strictly requires APPROVED status
+  router.post('/applications/:id/submit', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const result = repos.jobApplications.submit(req.params.id);
+    if (!result.success) {
+      return res.status(403).json({ error: result.error });
+    }
+
+    const app = result.application!;
+    if (app.opportunityId) {
+      repos.opportunities.transitionStatus(app.opportunityId, 'SUBMITTED', 'Farhan', 'Submitted application to target organization');
+    }
+
+    eventStream.broadcast({
+      id: `ev_app_submit_${app.id}`,
+      type: 'agent.message_sent',
+      timestamp: Date.now(),
+      message: `APPLICATION SUBMITTED to ${app.targetOrganization}: "${app.opportunityTitle}"`,
+      agent_id: 'system',
+      task_id: null,
+      mission_id: null,
+      metadata: { applicationId: app.id, organization: app.targetOrganization },
+    });
+
+    res.json({ success: true, message: 'Application submitted successfully.', application: app });
+  });
+
   return router;
 }
+

@@ -1,4 +1,15 @@
-import { AgentModel, TaskModel, MessageModel, MemoryEntry } from '../types/index.ts';
+import {
+  AgentModel,
+  TaskModel,
+  MessageModel,
+  MemoryEntry,
+  ProfessionalProfile,
+  ProfileSuggestion,
+  Opportunity,
+  JobApplication,
+  OpportunityType,
+  OpportunityStatus,
+} from '../types/index.ts';
 
 const BASE_URL = typeof window !== 'undefined' ? '' : 'http://127.0.0.1:3001';
 
@@ -230,4 +241,123 @@ export class ApiClient {
   public async getProviders(): Promise<any[] | null> {
     return this.fetchJson<any[]>('/api/providers');
   }
+
+  // 9. Farhan Professional Profile
+  public async getProfile(scope: string = 'FULL'): Promise<ProfessionalProfile | null> {
+    return this.fetchJson<ProfessionalProfile>(`/api/profile?scope=${scope}`);
+  }
+
+  public async updateProfile(updates: Partial<ProfessionalProfile>): Promise<{ success: boolean; profile?: ProfessionalProfile } | null> {
+    return this.fetchJson<{ success: boolean; profile?: ProfessionalProfile }>('/api/profile', {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  public async suggestProfileChange(suggestion: {
+    agentId: string;
+    reason: string;
+    section: string;
+    proposedChange: Record<string, unknown>;
+  }): Promise<{ success: boolean; suggestion?: ProfileSuggestion } | null> {
+    return this.fetchJson('/api/profile/suggest', {
+      method: 'POST',
+      body: JSON.stringify(suggestion),
+    });
+  }
+
+  public async getProfileSuggestions(status?: string): Promise<ProfileSuggestion[] | null> {
+    const q = status ? `?status=${status}` : '';
+    return this.fetchJson<ProfileSuggestion[]>(`/api/profile/suggestions${q}`);
+  }
+
+  public async approveProfileSuggestion(id: string): Promise<any | null> {
+    return this.fetchJson(`/api/profile/suggestions/${id}/approve`, {
+      method: 'POST',
+    });
+  }
+
+  public async rejectProfileSuggestion(id: string): Promise<any | null> {
+    return this.fetchJson(`/api/profile/suggestions/${id}/reject`, {
+      method: 'POST',
+    });
+  }
+
+  // 10. Opportunity HQ
+  public async getOpportunities(filter?: {
+    type?: OpportunityType;
+    status?: OpportunityStatus;
+    remote?: boolean;
+    limit?: number;
+  }): Promise<Opportunity[] | null> {
+    const params = new URLSearchParams();
+    if (filter?.type) params.set('type', filter.type);
+    if (filter?.status) params.set('status', filter.status);
+    if (filter?.remote !== undefined) params.set('remote', String(filter.remote));
+    if (filter?.limit) params.set('limit', String(filter.limit));
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return this.fetchJson<Opportunity[]>(`/api/opportunities${qs}`);
+  }
+
+  public async getOpportunity(id: string): Promise<Opportunity | null> {
+    return this.fetchJson<Opportunity>(`/api/opportunities/${id}`);
+  }
+
+  public async createOpportunity(opp: Partial<Opportunity>): Promise<Opportunity | null> {
+    return this.fetchJson<Opportunity>('/api/opportunities', {
+      method: 'POST',
+      body: JSON.stringify(opp),
+    });
+  }
+
+  public async updateOpportunity(id: string, updates: Partial<Opportunity>): Promise<Opportunity | null> {
+    return this.fetchJson<Opportunity>(`/api/opportunities/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  public async updateOpportunityStatus(id: string, status: OpportunityStatus, note?: string): Promise<any | null> {
+    return this.fetchJson(`/api/opportunities/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, note }),
+    });
+  }
+
+  // 11. Tailored Applications
+  public async getApplications(status?: string): Promise<JobApplication[] | null> {
+    const q = status ? `?status=${status}` : '';
+    return this.fetchJson<JobApplication[]>(`/api/applications${q}`);
+  }
+
+  public async getApplicationForOpportunity(oppId: string): Promise<JobApplication | null> {
+    return this.fetchJson<JobApplication>(`/api/applications/opportunity/${oppId}`);
+  }
+
+  public async createApplication(app: Partial<JobApplication>): Promise<JobApplication | null> {
+    return this.fetchJson<JobApplication>('/api/applications', {
+      method: 'POST',
+      body: JSON.stringify(app),
+    });
+  }
+
+  public async approveApplication(id: string): Promise<any | null> {
+    return this.fetchJson(`/api/applications/${id}/approve`, {
+      method: 'POST',
+    });
+  }
+
+  public async rejectApplication(id: string, reason: string): Promise<any | null> {
+    return this.fetchJson(`/api/applications/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  public async submitApplication(id: string): Promise<{ success: boolean; message?: string; error?: string } | null> {
+    return this.fetchJson<{ success: boolean; message?: string; error?: string }>(`/api/applications/${id}/submit`, {
+      method: 'POST',
+    });
+  }
 }
+

@@ -9,6 +9,11 @@ import { EventRepository } from './EventRepository.ts';
 import { AuditRepository } from './AuditRepository.ts';
 import { ProviderConfigRepository } from './ProviderConfigRepository.ts';
 import { ArtifactRepository } from './ArtifactRepository.ts';
+import { ProspectRepository } from './ProspectRepository.ts';
+import { OutreachDraftRepository } from './OutreachDraftRepository.ts';
+import { ProfileRepository } from './ProfileRepository.ts';
+import { OpportunityRepository } from './OpportunityRepository.ts';
+import { JobApplicationRepository } from './JobApplicationRepository.ts';
 
 export * from './UserRepository.ts';
 export * from './AgentRepository.ts';
@@ -20,6 +25,11 @@ export * from './EventRepository.ts';
 export * from './AuditRepository.ts';
 export * from './ProviderConfigRepository.ts';
 export * from './ArtifactRepository.ts';
+export * from './ProspectRepository.ts';
+export * from './OutreachDraftRepository.ts';
+export * from './ProfileRepository.ts';
+export * from './OpportunityRepository.ts';
+export * from './JobApplicationRepository.ts';
 
 export interface Repositories {
   users: UserRepository;
@@ -32,6 +42,11 @@ export interface Repositories {
   audit: AuditRepository;
   providers: ProviderConfigRepository;
   artifacts: ArtifactRepository;
+  prospects: ProspectRepository;
+  outreachDrafts: OutreachDraftRepository;
+  profile: ProfileRepository;
+  opportunities: OpportunityRepository;
+  jobApplications: JobApplicationRepository;
 }
 
 export function createRepositories(db: Database.Database): Repositories {
@@ -46,5 +61,11 @@ export function createRepositories(db: Database.Database): Repositories {
     audit: new AuditRepository(db),
     providers: new ProviderConfigRepository(db),
     artifacts: new ArtifactRepository(db),
+    prospects: new ProspectRepository(db),
+    outreachDrafts: new OutreachDraftRepository(db),
+    profile: new ProfileRepository(db),
+    opportunities: new OpportunityRepository(db),
+    jobApplications: new JobApplicationRepository(db),
   };
 }
+

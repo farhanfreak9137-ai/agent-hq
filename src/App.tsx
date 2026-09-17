@@ -16,6 +16,9 @@ import { CreateTaskModal } from './components/CreateTaskModal.tsx';
 import { DispatchMissionModal } from './components/DispatchMissionModal.tsx';
 import { MissionDashboard } from './components/MissionDashboard.tsx';
 import { EmailInboxModal } from './components/EmailInboxModal.tsx';
+import { FarhanProfileModal } from './components/FarhanProfileModal.tsx';
+import { OpportunityHQModal } from './components/OpportunityHQModal.tsx';
+import { OpportunityManager } from './opportunity/OpportunityManager.ts';
 import { EmailManager } from './email/EmailManager.ts';
 import { ExecutiveEmail } from './email/EmailTypes.ts';
 import { ApiClient } from './services/ApiClient.ts';
@@ -47,6 +50,9 @@ export default function App() {
   const [isTaskBoardOpen, setIsTaskBoardOpen] = useState<boolean>(false);
   const [isMissionDashboardOpen, setIsMissionDashboardOpen] = useState<boolean>(false);
   const [isInboxOpen, setIsInboxOpen] = useState<boolean>(false);
+  const [isOpportunityHQOpen, setIsOpportunityHQOpen] = useState<boolean>(false);
+  const [isFarhanProfileOpen, setIsFarhanProfileOpen] = useState<boolean>(false);
+  const [opportunityCount, setOpportunityCount] = useState<number>(() => OpportunityManager.getAll().length);
 
   // Initialize SSE event stream and sync persistent state on mount
   useEffect(() => {
@@ -73,6 +79,10 @@ export default function App() {
       } else {
         setPersistenceStatus('Local Mode');
       }
+    });
+
+    OpportunityManager.syncFromBackend().then(() => {
+      setOpportunityCount(OpportunityManager.getAll().length);
     });
 
     return () => {
@@ -106,6 +116,10 @@ export default function App() {
       if (t.startsWith('email.')) {
         setEmails([...EmailManager.getAll()]);
         setUnreadEmailCount(EmailManager.getUnreadCount());
+      }
+
+      if (t.startsWith('opportunity.') || t.startsWith('application.')) {
+        setOpportunityCount(OpportunityManager.getAll().length);
       }
 
       // Explicit event-driven mission UI updates
@@ -216,6 +230,9 @@ export default function App() {
         onOpenTaskBoard={() => setIsTaskBoardOpen(true)}
         onOpenMissionDashboard={() => setIsMissionDashboardOpen(true)}
         onOpenInbox={() => setIsInboxOpen(true)}
+        onOpenOpportunityHQ={() => setIsOpportunityHQOpen(true)}
+        onOpenFarhanProfile={() => setIsFarhanProfileOpen(true)}
+        opportunityCount={opportunityCount}
         unreadEmailCount={unreadEmailCount}
         currentUser={currentUser}
         persistenceStatus={persistenceStatus}
@@ -284,6 +301,19 @@ export default function App() {
           setUnreadEmailCount(EmailManager.getUnreadCount());
         }}
         emails={emails}
+      />
+
+      <FarhanProfileModal
+        isOpen={isFarhanProfileOpen}
+        onClose={() => setIsFarhanProfileOpen(false)}
+      />
+
+      <OpportunityHQModal
+        isOpen={isOpportunityHQOpen}
+        onClose={() => {
+          setIsOpportunityHQOpen(false);
+          setOpportunityCount(OpportunityManager.getAll().length);
+        }}
       />
     </div>
   );

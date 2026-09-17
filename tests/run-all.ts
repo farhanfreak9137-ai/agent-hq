@@ -9,10 +9,12 @@ import { testToolSecurity } from './tools-security.test.ts';
 import { testSecurityAudit } from './security-audit.test.ts';
 import { runPhase3bTests } from './phase3b.test.ts';
 import { runLoadTest } from './load.test.ts';
+import { testProspectingAgents } from './prospecting-agents.test.ts';
+import { testOpportunityAndProfileSuite } from './opportunity-profile.test.ts';
 
 async function main() {
   console.log('====================================================');
-  console.log('AGENT HQ — Master Automated Test Suite (Phases 2 - 3B)');
+  console.log('AGENT HQ — Master Automated Test Suite (Phases 2 - 3B & Opportunity HQ)');
   console.log('====================================================\n');
 
   try {
@@ -39,8 +41,14 @@ async function main() {
     await runPhase3bTests();
     await runLoadTest();
 
+    // Specialized Agents: Strategist, CRM / Operations, Outreach
+    await testProspectingAgents();
+
+    // Farhan Professional Profile & Opportunity HQ
+    await testOpportunityAndProfileSuite();
+
     console.log('\n====================================================');
-    console.log('ALL PHASE 2, 2.5, 3A & 3B TEST SUITES PASSED 100%!');
+    console.log('ALL AGENT HQ TEST SUITES PASSED 100%!');
     console.log('====================================================');
     process.exit(0);
   } catch (error) {

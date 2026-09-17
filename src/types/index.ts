@@ -5,7 +5,11 @@ export type AgentRole =
   | 'Designer'
   | 'Reviewer'
   | 'Tester'
-  | 'Security Engineer';
+  | 'Security Engineer'
+  | 'Writer'
+  | 'Strategist'
+  | 'CRM / Operations'
+  | 'Outreach';
 
 export type AgentStatus =
   | 'IDLE'
@@ -64,7 +68,11 @@ export type AgentCapability =
   | 'review'
   | 'testing'
   | 'security'
-  | 'orchestration';
+  | 'orchestration'
+  | 'writing'
+  | 'strategy'
+  | 'crm'
+  | 'outreach';
 
 export type AgentRuntimeStatus =
   | 'IDLE'
@@ -336,7 +344,10 @@ export type ArtifactType =
   | 'test_report'
   | 'design'
   | 'security_report'
-  | 'research_note';
+  | 'research_note'
+  | 'opportunity_recommendation'
+  | 'outreach_draft'
+  | 'crm_summary';
 
 export interface Artifact {
   id: string;
@@ -444,4 +455,432 @@ export interface HumanApprovalRequest {
   decidedAt?: number;
   decidedBy?: string;
 }
+
+// ==========================================
+// STRATEGIST, CRM & OUTREACH SPECIALIZED MODELS
+// ==========================================
+
+export interface StrategistRecommendation {
+  company: string;
+  opportunity: string;
+  evidence: string[];
+  identified_problem: string;
+  recommended_solution: string;
+  recommended_service: string;
+  scope: {
+    complexity: 'low' | 'medium' | 'high';
+    estimated_work: string;
+  };
+  fit: 'low' | 'medium' | 'high';
+  priority: 'low' | 'medium' | 'high';
+  confidence: number;
+  uncertainties: string[];
+  reasoning_summary: string;
+}
+
+export type ProspectStatus =
+  | 'DISCOVERED'
+  | 'RESEARCHED'
+  | 'QUALIFIED'
+  | 'DRAFTED'
+  | 'AWAITING_APPROVAL'
+  | 'APPROVED'
+  | 'CONTACTED'
+  | 'REPLIED'
+  | 'INTERESTED'
+  | 'MEETING'
+  | 'PROPOSAL'
+  | 'WON'
+  | 'LOST';
+
+export const VALID_PROSPECT_TRANSITIONS: Record<ProspectStatus, ProspectStatus[]> = {
+  DISCOVERED: ['RESEARCHED', 'LOST'],
+  RESEARCHED: ['QUALIFIED', 'LOST'],
+  QUALIFIED: ['DRAFTED', 'LOST'],
+  DRAFTED: ['AWAITING_APPROVAL', 'LOST'],
+  AWAITING_APPROVAL: ['APPROVED', 'DRAFTED', 'LOST'],
+  APPROVED: ['CONTACTED', 'LOST'],
+  CONTACTED: ['REPLIED', 'LOST'],
+  REPLIED: ['INTERESTED', 'LOST'],
+  INTERESTED: ['MEETING', 'PROPOSAL', 'LOST'],
+  MEETING: ['PROPOSAL', 'LOST'],
+  PROPOSAL: ['WON', 'LOST'],
+  WON: [],
+  LOST: ['DISCOVERED'],
+};
+
+export interface ProspectInteraction {
+  id: string;
+  timestamp: number;
+  type:
+    | 'research'
+    | 'opportunity_identified'
+    | 'draft_created'
+    | 'approval_requested'
+    | 'approved'
+    | 'rejected'
+    | 'contacted'
+    | 'reply_received'
+    | 'status_change'
+    | 'note';
+  summary: string;
+  actorAgentId: string;
+  details?: Record<string, unknown>;
+}
+
+export interface Prospect {
+  id: string;
+  company: string;
+  domain?: string;
+  contactName?: string;
+  contactEmail?: string;
+  status: ProspectStatus;
+  opportunity?: string;
+  recommendedService?: string;
+  fit?: 'low' | 'medium' | 'high';
+  priority?: 'low' | 'medium' | 'high';
+  researchNotes?: string[];
+  interactions: ProspectInteraction[];
+  draftId?: string;
+  createdAt: number;
+  updatedAt: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OutreachDraft {
+  id: string;
+  prospectId?: string;
+  company?: string;
+  recipient: string;
+  channel: 'email' | 'linkedin' | 'custom';
+  subject: string;
+  body: string;
+  personalization_points: string[];
+  source_evidence: string[];
+  confidence: number;
+  requires_human_approval: true;
+  status: 'DRAFTED' | 'REVIEWED' | 'AWAITING_HUMAN_APPROVAL' | 'APPROVED' | 'REJECTED' | 'SENT';
+  createdAt: number;
+  reviewedAt?: number;
+  reviewedBy?: string;
+  reviewNotes?: string;
+  approvedAt?: number;
+  approvedBy?: string;
+  rejectionReason?: string;
+  sentAt?: number;
+}
+
+// ==========================================
+// FARHAN PROFESSIONAL PROFILE & OPPORTUNITY HQ
+// ==========================================
+
+export type ProfileVisibility = 'PUBLIC' | 'PRIVATE' | 'APPLICATION_ONLY';
+
+export type ProfileSource =
+  | 'USER_PROVIDED'
+  | 'USER_CONFIRMED'
+  | 'SYSTEM_IMPORTED'
+  | 'AGENT_SUGGESTED';
+
+export type SourceVerification =
+  | 'VERIFIED'
+  | 'UNVERIFIED'
+  | 'DEMO';
+
+export type ResumeVariant = 'master' | 'frontend' | 'ai' | 'internship';
+
+export interface ProfileCompleteness {
+  score: number;
+  sections: {
+    identity: boolean;
+    education: boolean;
+    projects: boolean;
+    skills: boolean;
+    experience: boolean;
+    certifications: 'none' | boolean;
+    achievements: 'none' | boolean;
+    documents: 'none' | boolean;
+  };
+  summary: string;
+}
+
+export interface ProfileIdentity {
+  fullName: string;
+  professionalName?: string;
+  professionalHeadline: string;
+  email: string;
+  location: string;
+  portfolioUrl: string;
+  githubUrl: string;
+  bio?: string;
+  primaryInterests?: string[];
+  visibility: Record<string, ProfileVisibility>;
+  provenance?: ProfileSource;
+}
+
+export interface ProfileEducation {
+  id: string;
+  institution: string;
+  level?: string;
+  stream?: string;
+  program: string;
+  currentYear: string;
+  expectedGraduation: string;
+  previousInstitution?: string;
+  college?: string;
+  previousCollege?: string;
+  hscStatus?: string;
+  sscInstitution?: string;
+  sscYear?: string;
+  sscGpa?: string;
+  sscInformation?: string;
+  academicHistory?: string;
+  visibility: ProfileVisibility;
+  verified: boolean;
+  provenance?: ProfileSource;
+}
+
+export interface ProfileSkills {
+  frontend: string[];
+  backend: string[];
+  ai: string[];
+  cloud: string[];
+  databases: string[];
+  tools: string[];
+  languages: string[];
+  development?: string[];
+  verifiedSkills: string[];
+  skillContext?: Record<string, 'PROJECT_EXPERIENCE' | 'LEARNING' | 'PROFESSIONAL_EXPERIENCE'>;
+  visibility: Record<string, ProfileVisibility>;
+  provenance?: ProfileSource;
+}
+
+export interface ProfileProject {
+  id: string;
+  name: string;
+  description: string;
+  technologies: string[];
+  role: string;
+  status?: string;
+  projectType?: 'personal' | 'student' | 'commercial' | 'open_source';
+  capabilities?: string[];
+  url?: string;
+  githubUrl?: string;
+  evidence: string[];
+  visibility: ProfileVisibility;
+  verified: boolean;
+  provenance?: ProfileSource;
+}
+
+export interface ProfileExperience {
+  id: string;
+  organization: string;
+  role: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+  reasonForLeaving?: string;
+  verified: boolean;
+  visibility: ProfileVisibility;
+  provenance?: ProfileSource;
+}
+
+export interface ProfileCertification {
+  id: string;
+  name: string;
+  issuer: string;
+  issueDate: string;
+  verified: boolean;
+  visibility: ProfileVisibility;
+  provenance?: ProfileSource;
+}
+
+export interface ProfileAchievement {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  verified: boolean;
+  visibility: ProfileVisibility;
+  provenance?: ProfileSource;
+}
+
+export interface ProfileServices {
+  webDevelopment: boolean;
+  frontendDevelopment: boolean;
+  AIIntegration: boolean;
+  automation: boolean;
+  otherApprovedServices: string[];
+  visibility: Record<string, ProfileVisibility>;
+  provenance?: ProfileSource;
+}
+
+export interface ProfilePreferences {
+  targetOpportunityTypes: OpportunityType[];
+  targetIndustries: string[];
+  targetLocations: string[];
+  remotePreference: 'remote_only' | 'hybrid' | 'onsite' | 'flexible';
+  visibility: ProfileVisibility;
+}
+
+export interface ProfileDocuments {
+  resumeVersions: Array<{
+    id: string;
+    name: string;
+    targetRole?: string;
+    content: string;
+    updatedAt: number;
+  }>;
+  coverLetterTemplates: Array<{
+    id: string;
+    name: string;
+    template: string;
+    updatedAt: number;
+  }>;
+}
+
+export interface ProfessionalProfile {
+  id: string;
+  identity: ProfileIdentity;
+  education: ProfileEducation[];
+  skills: ProfileSkills;
+  projects: ProfileProject[];
+  experience: ProfileExperience[];
+  certifications: ProfileCertification[];
+  achievements: ProfileAchievement[];
+  services: ProfileServices;
+  preferences: ProfilePreferences;
+  documents: ProfileDocuments;
+  createdAt: number;
+  updatedAt: number;
+  version: number;
+}
+
+export interface ProfileSuggestion {
+  id: string;
+  agentId: string;
+  reason: string;
+  section: string;
+  proposedChange: Record<string, unknown>;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: number;
+  decidedAt?: number;
+  decidedBy?: string;
+}
+
+export type OpportunityType =
+  | 'internship'
+  | 'job'
+  | 'freelance'
+  | 'hackathon'
+  | 'competition'
+  | 'open_source'
+  | 'collaboration'
+  | 'scholarship'
+  | 'other';
+
+export type OpportunityStatus =
+  | 'DISCOVERED'
+  | 'REVIEWING'
+  | 'QUALIFIED'
+  | 'APPLICATION_DRAFTED'
+  | 'AWAITING_APPROVAL'
+  | 'SUBMITTED'
+  | 'RESPONSE_RECEIVED'
+  | 'CLOSED'
+  | 'REJECTED';
+
+export const VALID_OPPORTUNITY_TRANSITIONS: Record<OpportunityStatus, OpportunityStatus[]> = {
+  DISCOVERED: ['REVIEWING', 'REJECTED'],
+  REVIEWING: ['QUALIFIED', 'REJECTED'],
+  QUALIFIED: ['APPLICATION_DRAFTED', 'REJECTED'],
+  APPLICATION_DRAFTED: ['AWAITING_APPROVAL', 'REJECTED'],
+  AWAITING_APPROVAL: ['SUBMITTED', 'APPLICATION_DRAFTED', 'REJECTED'],
+  SUBMITTED: ['RESPONSE_RECEIVED', 'CLOSED', 'REJECTED'],
+  RESPONSE_RECEIVED: ['CLOSED', 'REJECTED'],
+  CLOSED: ['DISCOVERED'],
+  REJECTED: ['DISCOVERED'],
+};
+
+export interface OpportunityEligibilityCheck {
+  criterion: string;
+  status: 'MATCH' | 'GAP' | 'VERIFY';
+  details?: string;
+}
+
+export interface OpportunityFitAnalysis {
+  strongMatches: string[];
+  potentialGaps: string[];
+  eligibilityChecks: OpportunityEligibilityCheck[];
+  evidence: string[];
+  matchPercentage?: number;
+  reasoning: string;
+}
+
+export interface Opportunity {
+  id: string;
+  title: string;
+  organization: string;
+  type: OpportunityType;
+  source: string;
+  sourceUrl: string;
+  location: string;
+  remote: boolean;
+  description: string;
+  requirements: string[];
+  eligibility: string[];
+  deadline?: string | number;
+  discoveredAt: number;
+  matchedSkills: string[];
+  missingSkills: string[];
+  evidence: string[];
+  fitAnalysis?: OpportunityFitAnalysis;
+  status: OpportunityStatus;
+  applicationDraftId?: string;
+  sourceVerification: SourceVerification;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface JobApplication {
+  id: string;
+  opportunityId: string;
+  targetOrganization: string;
+  opportunityTitle: string;
+  selectedProfileInformation: {
+    selectedSkills: string[];
+    selectedProjects: Array<{
+      name: string;
+      role: string;
+      technologies: string[];
+      evidence: string[];
+    }>;
+    educationSummary: string;
+  };
+  tailoredResume: {
+    headline: string;
+    summary: string;
+    highlightedSkills: string[];
+    tailoredProjects: Array<{
+      name: string;
+      description: string;
+      role: string;
+      technologies: string[];
+      evidence: string[];
+    }>;
+    education: string;
+  };
+  applicationMessage: string;
+  coverLetter?: string;
+  missingInformation: string[];
+  potentialRisks: string[];
+  status: 'DRAFTED' | 'AWAITING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'SUBMITTED';
+  createdAt: number;
+  updatedAt: number;
+  approvedAt?: number;
+  approvedBy?: string;
+  rejectionReason?: string;
+  submittedAt?: number;
+}
+
 

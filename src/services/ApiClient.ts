@@ -225,6 +225,27 @@ export class ApiClient {
     });
   }
 
+  public async sendAgentChat(params: {
+    agentId: string;
+    userMessage: string;
+    history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+    providerId?: string;
+  }): Promise<{
+    reply: string;
+    proposedTask?: {
+      title: string;
+      description: string;
+      priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    } | null;
+    providerUsed?: string;
+    modelUsed?: string;
+  } | null> {
+    return this.fetchJson('/api/agents/chat', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
   // 7. Memory
   public async getMemory(agentId: string, limit: number = 25): Promise<MemoryEntry[] | null> {
     return this.fetchJson<MemoryEntry[]>(`/api/memory/${agentId}?limit=${limit}`);

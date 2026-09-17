@@ -18,6 +18,7 @@ import { MissionDashboard } from './components/MissionDashboard.tsx';
 import { EmailInboxModal } from './components/EmailInboxModal.tsx';
 import { FarhanProfileModal } from './components/FarhanProfileModal.tsx';
 import { OpportunityHQModal } from './components/OpportunityHQModal.tsx';
+import { SettingsModal } from './components/SettingsModal.tsx';
 import { OpportunityManager } from './opportunity/OpportunityManager.ts';
 import { EmailManager } from './email/EmailManager.ts';
 import { ExecutiveEmail } from './email/EmailTypes.ts';
@@ -52,6 +53,7 @@ export default function App() {
   const [isInboxOpen, setIsInboxOpen] = useState<boolean>(false);
   const [isOpportunityHQOpen, setIsOpportunityHQOpen] = useState<boolean>(false);
   const [isFarhanProfileOpen, setIsFarhanProfileOpen] = useState<boolean>(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [opportunityCount, setOpportunityCount] = useState<number>(() => OpportunityManager.getAll().length);
 
   // Initialize SSE event stream and sync persistent state on mount
@@ -232,6 +234,7 @@ export default function App() {
         onOpenInbox={() => setIsInboxOpen(true)}
         onOpenOpportunityHQ={() => setIsOpportunityHQOpen(true)}
         onOpenFarhanProfile={() => setIsFarhanProfileOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         opportunityCount={opportunityCount}
         unreadEmailCount={unreadEmailCount}
         currentUser={currentUser}
@@ -314,6 +317,12 @@ export default function App() {
           setIsOpportunityHQOpen(false);
           setOpportunityCount(OpportunityManager.getAll().length);
         }}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onResetSimulation={handleReset}
       />
     </div>
   );

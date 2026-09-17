@@ -690,6 +690,7 @@ export interface ProfileCertification {
   name: string;
   issuer: string;
   issueDate: string;
+  credentialUrl?: string;
   verified: boolean;
   visibility: ProfileVisibility;
   provenance?: ProfileSource;

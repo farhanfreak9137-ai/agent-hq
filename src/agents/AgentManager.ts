@@ -370,6 +370,7 @@ class AgentManagerClass {
     if (!agent) return;
     agent.providerId = providerId;
     this.runtimes.delete(agentId);
+    this.save();
     EventBus.emit({
       id: generateId('ev'),
       type: 'agent.state_changed',
@@ -379,6 +380,20 @@ class AgentManagerClass {
       currentStatus: agent.status,
       message: `${agent.name} provider updated to [${providerId}]`,
     });
+  }
+
+  public setAllAgentProviders(providerId: string): void {
+    for (const agent of this.agents.values()) {
+      agent.providerId = providerId;
+      this.runtimes.delete(agent.id);
+    }
+    this.save();
+    EventBus.emit({
+      id: generateId('ev'),
+      type: 'agent.state_changed',
+      timestamp: Date.now(),
+      message: `All agent providers updated to [${providerId}]`,
+    } as any);
   }
 
   public incrementStats(agentId: string, key: keyof AgentModel['stats'], amount: number = 1): void {

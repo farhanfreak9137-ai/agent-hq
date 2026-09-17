@@ -128,6 +128,17 @@ class MessageBusClass {
     );
   }
 
+  public getUserConversation(agentId: string): MessageModel[] {
+    return this.messages
+      .filter(
+        (m) =>
+          (m.fromAgentId === 'farhan' && m.toAgentId === agentId) ||
+          (m.fromAgentId === agentId && m.toAgentId === 'farhan')
+      )
+      .slice(0, 50)
+      .reverse();
+  }
+
   public getHistory(agentId?: string): MessageModel[] {
     return agentId ? this.getMessagesForAgent(agentId) : this.getAllMessages();
   }

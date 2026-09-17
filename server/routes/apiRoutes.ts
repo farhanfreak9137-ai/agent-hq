@@ -1032,6 +1032,146 @@ Produce a structured JSON response with:
   });
 
   // ----------------------------------------------------
+  // 6b. Direct Conversational Agent Chat & Task Initiation
+  // ----------------------------------------------------
+  router.post('/agents/chat', async (req: Request, res: Response) => {
+    const { agentId, userMessage, history, providerId } = req.body;
+
+    if (!agentId || !userMessage) {
+      return res.status(400).json({ error: 'Missing required parameters (agentId, userMessage)' });
+    }
+
+    // Look up agent details
+    const agentEntity = repos.agents.getById(agentId);
+    const agentName = agentEntity?.name || agentId.toUpperCase();
+    const role = agentEntity?.role || 'Autonomous Specialist';
+    const directive = agentEntity?.system_directive || `Act as ${agentName}, ${role} at Agent HQ.`;
+    const capabilities = agentEntity?.capabilities || [];
+    const targetProvider = providerId || agentEntity?.provider_id || 'gemini';
+
+    // Format previous conversation context if provided
+    let conversationContext = '';
+    if (Array.isArray(history) && history.length > 0) {
+      conversationContext = '\n\nRecent conversation history:\n' +
+        history.slice(-8).map((h: any) => `${h.role === 'user' ? 'Farhan' : agentName}: ${h.content}`).join('\n');
+    }
+
+    const prompt = `You are ${agentName}, an autonomous AI specialist at Agent HQ with the role of "${role}".
+Your system directive: ${directive}
+Your capabilities: ${JSON.stringify(capabilities)}.
+
+You are directly conversing with Farhan, the founder and operator of Agent HQ.
+CRITICAL GUIDELINES:
+1. Converse naturally, conversationally, and authentically in character.
+2. If Farhan asks general questions like "how are you doing", "what are you working on", or explores ideas, reply directly and conversationally as a real peer and partner. Do NOT force a task into existence for casual chat.
+3. When Farhan asks for advice, technical planning, or architecture design, share clear, thoughtful insights, step-by-step plans, and collaborative feedback.
+4. When Farhan explicitly instructs you to initiate/create a task, or when you both clearly agree on a concrete task initiative to execute, provide a structured TASK PROPOSAL block at the very end of your response using this EXACT format:
+\`\`\`proposal
+{
+  "title": "Clear concise task title",
+  "description": "Specific deliverables and execution steps",
+  "priority": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+}
+\`\`\`
+If this is regular discussion or planning without a concrete task to launch right now, DO NOT include the proposal block. Keep your response concise, sharp, and helpful.
+${conversationContext}
+
+Farhan: "${userMessage}"
+${agentName}:`;
+
+    try {
+      let cascadeRes: CascadeExecutionResult;
+      if (targetProvider === 'mock') {
+        cascadeRes = {
+          text: `Hey Farhan! Doing great and staying focused on our ${role.toLowerCase()} initiatives. What's on your mind?`,
+          provider: 'mock',
+          model: 'mock-engine',
+          toolsUsed: ['local_heuristic'],
+          durationMs: 50,
+        };
+      } else {
+        cascadeRes = await callAIWithCascade(prompt, targetProvider);
+      }
+
+      const rawText = cascadeRes.text || `Hello Farhan, ${agentName} reporting in.`;
+      let cleanReply = rawText;
+      let proposedTask: { title: string; description: string; priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' } | null = null;
+
+      const proposalMatch = rawText.match(/```proposal\s*(\{[\s\S]*?\})\s*```/i);
+      if (proposalMatch) {
+        try {
+          const parsed = JSON.parse(proposalMatch[1].trim());
+          if (parsed.title) {
+            const prio = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(parsed.priority) ? parsed.priority : 'MEDIUM';
+            proposedTask = {
+              title: parsed.title,
+              description: parsed.description || '',
+              priority: prio as any,
+            };
+            cleanReply = rawText.replace(/```proposal\s*\{[\s\S]*?\}\s*```/i, '').trim();
+          }
+        } catch (err) {
+          console.warn('[Agent Chat] Could not parse proposal JSON:', err);
+        }
+      }
+
+      const now = Date.now();
+      // Record user message
+      repos.messages.save({
+        id: `msg_${now}_user_${Math.random().toString(36).substring(2, 7)}`,
+        source_agent_id: 'farhan',
+        target_agent_id: agentId,
+        content: userMessage,
+        type: 'chat',
+        task_id: null,
+        timestamp: now,
+        payload: null,
+      });
+
+      // Record agent reply
+      const replyMsg = repos.messages.save({
+        id: `msg_${now + 1}_${agentId}_${Math.random().toString(36).substring(2, 7)}`,
+        source_agent_id: agentId,
+        target_agent_id: 'farhan',
+        content: cleanReply,
+        type: 'chat',
+        task_id: null,
+        timestamp: now + 1,
+        payload: proposedTask ? { proposedTask } : null,
+      });
+
+      // Broadcast on SSE stream
+      eventStream.broadcast({
+        id: `ev_chat_${Date.now()}`,
+        type: 'agent.message_sent',
+        timestamp: replyMsg.timestamp,
+        message: `${agentName} → Farhan: "${cleanReply.substring(0, 60)}"`,
+        agent_id: agentId,
+        task_id: null,
+        mission_id: null,
+        metadata: { targetAgentId: 'farhan', type: 'chat', proposedTask },
+      });
+
+      return res.json({
+        reply: cleanReply,
+        proposedTask,
+        providerUsed: cascadeRes.provider,
+        modelUsed: cascadeRes.model,
+      });
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.warn(`[Agent Chat Error (${agentName})]:`, errorMsg);
+      const fallbackReply = `Hey Farhan, I hear you loud and clear. My current status is active and I'm ready to collaborate on our ${role.toLowerCase()} initiatives. What are we planning?`;
+      return res.json({
+        reply: fallbackReply,
+        proposedTask: null,
+        providerUsed: 'fallback',
+        modelUsed: 'local-resilience',
+      });
+    }
+  });
+
+  // ----------------------------------------------------
   // 7. Memory Endpoints
   // ----------------------------------------------------
 

@@ -13,6 +13,7 @@ import {
   Compass,
   Briefcase,
   User,
+  Settings,
 } from 'lucide-react';
 import { AgentModel, TaskModel, ProviderHealth } from '../types/index.ts';
 import { ProviderRegistry } from '../agents/ProviderRegistry.ts';
@@ -37,6 +38,7 @@ interface TopBarProps {
   onOpenInbox?: () => void;
   onOpenOpportunityHQ?: () => void;
   onOpenFarhanProfile?: () => void;
+  onOpenSettings?: () => void;
   opportunityCount?: number;
   unreadEmailCount?: number;
   currentUser?: { username: string; role: string } | null;
@@ -60,6 +62,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenInbox,
   onOpenOpportunityHQ,
   onOpenFarhanProfile,
+  onOpenSettings,
   opportunityCount = 0,
   unreadEmailCount = 0,
   currentUser,
@@ -235,6 +238,18 @@ export const TopBar: React.FC<TopBarProps> = ({
           >
             <User className="w-3.5 h-3.5 text-cyan-400" />
             <span className="hidden sm:inline">Farhan Profile</span>
+          </button>
+        )}
+
+        {/* Settings Button */}
+        {onOpenSettings && (
+          <button
+            onClick={onOpenSettings}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-medium transition cursor-pointer"
+            title="Agent HQ Settings & Global AI Provider Engine"
+          >
+            <Settings className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Settings</span>
           </button>
         )}
 

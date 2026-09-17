@@ -1,15 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { X, Focus, Home, Coffee, Send, MessageSquare, CheckCircle, Activity, Sparkles, User, Cpu, Wrench, Database } from 'lucide-react';
-import { AgentModel, TaskModel } from '../types/index.ts';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  X,
+  Focus,
+  Home,
+  Coffee,
+  Send,
+  MessageSquare,
+  CheckCircle,
+  Activity,
+  Sparkles,
+  User,
+  Cpu,
+  Wrench,
+  Database,
+  Rocket,
+  Plus,
+  Bot,
+  AlertCircle,
+} from 'lucide-react';
+import { AgentModel, TaskPriority, MessageModel } from '../types/index.ts';
 import { MessageBus } from '../communication/MessageBus.ts';
 import { TaskManager } from '../tasks/TaskManager.ts';
 import { AgentManager } from '../agents/AgentManager.ts';
 import { EventBus } from '../events/EventBus.ts';
 import { SimulationEngine } from '../simulation/SimulationEngine.ts';
 import { Camera } from '../world/Camera.ts';
-
 import { ArtifactManager } from '../artifacts/ArtifactManager.ts';
-import { TelemetryService } from '../telemetry/TelemetryService.ts';
+import { ApiClient } from '../services/ApiClient.ts';
+import { EmailManager } from '../email/EmailManager.ts';
+import { TaskConfirmationModal } from './TaskConfirmationModal.tsx';
 
 interface AgentInspectorProps {
   agent: AgentModel | null;
@@ -24,14 +43,37 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
   camera,
   simulationEngine,
 }) => {
-  const [activeTab, setActiveTab] = useState<'details' | 'messages' | 'advanced'>('details');
-  const [quickMsg, setQuickMsg] = useState('');
+  const [activeTab, setActiveTab] = useState<'chat' | 'details' | 'messages' | 'advanced'>('chat');
+  const [chatInput, setChatInput] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
   const [, setTick] = useState(0);
+
+  // Task confirmation modal state
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [pendingTaskData, setPendingTaskData] = useState<{
+    title: string;
+    description: string;
+    priority: TaskPriority;
+    assignedAgentId: string;
+  }>({
+    title: '',
+    description: '',
+    priority: 'MEDIUM',
+    assignedAgentId: agent?.id || 'boss',
+  });
+
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const unsub = EventBus.on('*', () => setTick((t) => t + 1));
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeTab, isThinking]);
 
   if (!agent) return null;
 
@@ -42,11 +84,10 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
   const tools = agent.tools || [];
 
   const agentArtifacts = ArtifactManager.getInstance().getByAgentId(agent.id);
-  const agentTelemetry = TelemetryService.getInstance().getAgentTelemetry(agent.id);
-
   const currentTask = agent.currentTaskId ? TaskManager.getById(agent.currentTaskId) : null;
-  const recentMessages = MessageBus.getMessagesForAgent(agent.id).slice(0, 10);
-  const agentTasks = TaskManager.getByAgentId(agent.id);
+  const recentMessages = MessageBus.getMessagesForAgent(agent.id).slice(0, 15);
+  const directConversation = MessageBus.getUserConversation(agent.id);
+  const allAgents = AgentManager.getAll();
 
   const handleFocus = () => {
     camera.focusOnPosition(agent.currentPosition, 1.4);
@@ -60,14 +101,151 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
     simulationEngine.moveAgentTo(agent.id, { x: 760, y: 505 });
   };
 
-  const handleSendQuickMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickMsg.trim()) return;
+  // Direct conversational chat with agent
+  const handleSendChatMessage = async (textToSend?: string) => {
+    const messageText = (textToSend || chatInput).trim();
+    if (!messageText || isThinking) return;
 
-    // Send to BOSS or NOVA
-    const targetId = agent.id === 'boss' ? 'nova' : 'boss';
-    simulationEngine.sendAgentMessage(agent.id, targetId, quickMsg.trim());
-    setQuickMsg('');
+    setChatInput('');
+    setIsThinking(true);
+
+    // 1. Immediately record user message locally
+    MessageBus.sendMessage('farhan', agent.id, messageText, 'general');
+
+    // 2. Set agent state in office world
+    AgentManager.setStatus(agent.id, 'THINKING', `Consulting AI for Farhan: "${messageText.substring(0, 20)}..."`);
+    AgentManager.setSpeech(agent.id, 'Thinking...', 3000);
+
+    // 3. Prepare conversation history for the AI prompt
+    const history = directConversation.slice(-6).map((m) => ({
+      role: (m.fromAgentId === 'farhan' ? 'user' : 'assistant') as 'user' | 'assistant',
+      content: m.content,
+    }));
+
+    try {
+      const res = await ApiClient.getInstance().sendAgentChat({
+        agentId: agent.id,
+        userMessage: messageText,
+        history,
+        providerId: agent.providerId,
+      });
+
+      if (res && res.reply) {
+        // Record agent reply in MessageBus
+        MessageBus.sendMessage(
+          agent.id,
+          'farhan',
+          res.reply,
+          'response',
+          undefined,
+          res.proposedTask ? { proposedTask: res.proposedTask } : undefined
+        );
+
+        AgentManager.setStatus(agent.id, 'COMMUNICATING', `Talking with Farhan`);
+        AgentManager.setSpeech(agent.id, res.reply.substring(0, 50) + (res.reply.length > 50 ? '...' : ''), 4000);
+
+        // If a task proposal was returned, we keep it ready for 1-click confirmation
+        if (res.proposedTask) {
+          setPendingTaskData({
+            title: res.proposedTask.title,
+            description: res.proposedTask.description,
+            priority: (res.proposedTask.priority as TaskPriority) || 'MEDIUM',
+            assignedAgentId: agent.id,
+          });
+        }
+      } else {
+        // Fallback in-character response if server unreachable
+        const fallbackText = `I'm on it, Farhan! Ready to assist with ${agent.role} priorities.`;
+        MessageBus.sendMessage(agent.id, 'farhan', fallbackText, 'response');
+        AgentManager.setSpeech(agent.id, fallbackText, 3000);
+      }
+    } catch (err) {
+      console.warn('[AgentChat] Error communicating with agent:', err);
+      const errReply = `Acknowledged Farhan. Experiencing a momentary network hitch, but standing by for instructions.`;
+      MessageBus.sendMessage(agent.id, 'farhan', errReply, 'response');
+      AgentManager.setSpeech(agent.id, errReply, 3000);
+    } finally {
+      setIsThinking(false);
+      AgentManager.setStatus(agent.id, agent.currentTaskId ? 'WORKING' : 'IDLE');
+    }
+  };
+
+  // Open confirmation popup from proposed task or manual trigger
+  const handleOpenTaskConfirm = (proposed?: { title: string; description: string; priority: TaskPriority }) => {
+    if (proposed) {
+      setPendingTaskData({
+        title: proposed.title,
+        description: proposed.description,
+        priority: proposed.priority,
+        assignedAgentId: agent.id,
+      });
+    } else {
+      setPendingTaskData({
+        title: `Task with ${agent.name}`,
+        description: `Collaborative initiative planned with ${agent.name} (${agent.role}).`,
+        priority: 'MEDIUM',
+        assignedAgentId: agent.id,
+      });
+    }
+    setIsConfirmModalOpen(true);
+  };
+
+  // Confirm and launch task
+  const handleLaunchConfirmedTask = (details: {
+    title: string;
+    description: string;
+    priority: TaskPriority;
+    assignedAgentId: string;
+  }) => {
+    const newTask = TaskManager.createTask({
+      title: details.title,
+      description: details.description || 'Task initiated via direct chat.',
+      priority: details.priority,
+      assignedAgentId: details.assignedAgentId,
+    });
+
+    TaskManager.updateStatus(newTask.id, 'IN_PROGRESS');
+    AgentManager.assignTask(details.assignedAgentId, newTask.id);
+    AgentManager.setStatus(details.assignedAgentId, 'WORKING', `Working on "${details.title}"`);
+    AgentManager.setSpeech(details.assignedAgentId, `Initiating task: ${details.title}`, 4000);
+
+    // Record confirmation event in direct chat thread
+    MessageBus.sendMessage(
+      'farhan',
+      details.assignedAgentId,
+      `📋 Confirmed task: "${details.title}" [${details.priority}]`,
+      'task_handover',
+      newTask.id
+    );
+
+    MessageBus.sendMessage(
+      details.assignedAgentId,
+      'farhan',
+      `Understood Farhan! I'm starting work on "${details.title}" immediately. You can track live progress in the Task Pipeline.`,
+      'response',
+      newTask.id
+    );
+
+    // Execute the task via AgentManager runtime
+    AgentManager.executeTask(details.assignedAgentId, newTask)
+      .then((result) => {
+        if (result.success) {
+          TaskManager.updateStatus(newTask.id, 'COMPLETED', result);
+          EmailManager.sendTaskReport(
+            details.assignedAgentId,
+            details.title,
+            result.summary || 'Direct task completed successfully.',
+            result.output,
+            result.toolsUsed
+          );
+        } else {
+          TaskManager.updateStatus(newTask.id, 'BLOCKED', { error: result.error });
+        }
+      })
+      .catch((err) => {
+        console.warn('[TaskConfirmation] Direct task execution error:', err);
+        TaskManager.updateStatus(newTask.id, 'BLOCKED', { error: String(err) });
+      });
   };
 
   const getStatusBadge = (status: string) => {
@@ -79,7 +257,7 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
       case 'WAITING_APPROVAL':
         return 'bg-purple-500/10 text-purple-400 border-purple-500/30 animate-pulse';
       case 'THINKING':
-        return 'bg-sky-500/10 text-sky-400 border-sky-500/30';
+        return 'bg-sky-500/10 text-sky-400 border-sky-500/30 animate-pulse';
       case 'COMMUNICATING':
         return 'bg-purple-500/10 text-purple-400 border-purple-500/30';
       case 'COMPLETED':
@@ -92,101 +270,285 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
   };
 
   return (
-    <aside className="fixed top-18 right-4 bottom-4 w-84 md:w-96 bg-slate-950/95 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl z-20 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
-      {/* Header */}
-      <div className="p-4 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {/* Avatar Icon Box */}
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-lg border"
-            style={{
-              backgroundColor: `${agent.avatar.accentColor}18`,
-              borderColor: agent.avatar.accentColor,
-            }}
-          >
-            <span>{agent.roleSymbol}</span>
+    <>
+      <aside className="fixed top-18 right-4 bottom-4 w-92 md:w-104 bg-slate-950/95 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl z-20 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+        {/* Header */}
+        <div className="p-3.5 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl shadow-lg border"
+              style={{
+                backgroundColor: `${agent.avatar.accentColor}18`,
+                borderColor: agent.avatar.accentColor,
+              }}
+            >
+              <span>{agent.roleSymbol}</span>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-extrabold text-slate-100">{agent.name}</h2>
+                <span
+                  className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full border uppercase ${getStatusBadge(
+                    runtimeStatus
+                  )}`}
+                >
+                  {runtimeStatus}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-medium">
+                {agent.role} • <span className="text-cyan-400 uppercase font-mono text-[10px]">{agent.providerId || 'mock'}</span>
+              </p>
+            </div>
           </div>
 
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-extrabold text-slate-100">{agent.name}</h2>
-              <span
-                className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full border uppercase ${getStatusBadge(
-                  agent.status
-                )}`}
-              >
-                {agent.status}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 font-medium">{agent.role}</p>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+        {/* Tabs Bar */}
+        <div className="flex border-b border-slate-800 bg-slate-900/50 text-xs font-medium text-slate-400">
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`flex-1 py-2.5 text-center border-b-2 flex items-center justify-center gap-1.5 transition cursor-pointer ${
+              activeTab === 'chat'
+                ? 'border-cyan-400 text-cyan-300 font-bold bg-cyan-950/20'
+                : 'border-transparent hover:text-slate-200'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Direct Chat</span>
+            {directConversation.length > 0 && (
+              <span className="text-[10px] font-mono px-1 rounded-full bg-slate-800 text-slate-300">
+                {directConversation.length}
+              </span>
+            )}
+          </button>
 
-      {/* Simplified Tabs */}
-      <div className="flex border-b border-slate-800 bg-slate-900/40 text-xs font-medium text-slate-400">
-        <button
-          onClick={() => setActiveTab('details')}
-          className={`flex-1 py-2.5 text-center border-b-2 transition ${
-            activeTab === 'details'
-              ? 'border-cyan-400 text-cyan-300 font-semibold'
-              : 'border-transparent hover:text-slate-200'
-          }`}
-        >
-          Overview & Work
-        </button>
-        <button
-          onClick={() => setActiveTab('messages')}
-          className={`flex-1 py-2.5 text-center border-b-2 transition ${
-            activeTab === 'messages'
-              ? 'border-cyan-400 text-cyan-300 font-semibold'
-              : 'border-transparent hover:text-slate-200'
-          }`}
-        >
-          Messages {recentMessages.length > 0 && `(${recentMessages.length})`}
-        </button>
-        <button
-          onClick={() => setActiveTab('advanced')}
-          className={`flex-1 py-2.5 text-center border-b-2 transition ${
-            activeTab === 'advanced'
-              ? 'border-cyan-400 text-cyan-300 font-semibold'
-              : 'border-transparent hover:text-slate-200'
-          }`}
-        >
-          Advanced
-        </button>
-      </div>
+          <button
+            onClick={() => setActiveTab('details')}
+            className={`flex-1 py-2.5 text-center border-b-2 transition cursor-pointer ${
+              activeTab === 'details'
+                ? 'border-cyan-400 text-cyan-300 font-bold bg-cyan-950/20'
+                : 'border-transparent hover:text-slate-200'
+            }`}
+          >
+            Overview
+          </button>
 
-      {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <button
+            onClick={() => setActiveTab('messages')}
+            className={`flex-1 py-2.5 text-center border-b-2 transition cursor-pointer ${
+              activeTab === 'messages'
+                ? 'border-cyan-400 text-cyan-300 font-bold bg-cyan-950/20'
+                : 'border-transparent hover:text-slate-200'
+            }`}
+          >
+            Comms Feed
+          </button>
+
+          <button
+            onClick={() => setActiveTab('advanced')}
+            className={`flex-1 py-2.5 text-center border-b-2 transition cursor-pointer ${
+              activeTab === 'advanced'
+                ? 'border-cyan-400 text-cyan-300 font-bold bg-cyan-950/20'
+                : 'border-transparent hover:text-slate-200'
+            }`}
+          >
+            Config
+          </button>
+        </div>
+
+        {/* Tab 1: Direct Conversational Chat */}
+        {activeTab === 'chat' && (
+          <div className="flex-1 flex flex-col min-h-0 bg-slate-950/60">
+            {/* Messages Scroll Area */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-3 font-sans">
+              {directConversation.length === 0 ? (
+                <div className="text-center py-8 px-4 space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto text-2xl">
+                    {agent.roleSymbol}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200">
+                      Direct Channel with {agent.name}
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
+                      Talk, ask questions, or collaboratively plan tasks. Real AI conversational responses via {agent.providerId?.toUpperCase() || 'GEMINI'}.
+                    </p>
+                  </div>
+
+                  {/* Starter Chips */}
+                  <div className="flex flex-wrap justify-center gap-1.5 pt-2">
+                    <button
+                      onClick={() => handleSendChatMessage(`Hey ${agent.name}, how are you doing?`)}
+                      className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] text-cyan-300 transition cursor-pointer"
+                    >
+                      "How are you doing?"
+                    </button>
+                    <button
+                      onClick={() => handleSendChatMessage(`What are you currently focusing on?`)}
+                      className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] text-cyan-300 transition cursor-pointer"
+                    >
+                      "What are you focusing on?"
+                    </button>
+                    <button
+                      onClick={() => handleSendChatMessage(`Let's plan a task for you to execute.`)}
+                      className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] text-cyan-300 transition cursor-pointer"
+                    >
+                      "Let's plan a task"
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                directConversation.map((m) => {
+                  const isUser = m.fromAgentId === 'farhan';
+                  const proposedTask =
+                    (m.handoffData as any)?.proposedTask ||
+                    (m as any).payload?.proposedTask;
+
+                  return (
+                    <div
+                      key={m.id}
+                      className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-1`}
+                    >
+                      <div className="flex items-center gap-1 text-[10px] text-slate-500 px-1">
+                        <span className="font-semibold text-slate-400">
+                          {isUser ? 'You (Farhan)' : agent.name}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          {new Date(m.timestamp).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+
+                      <div
+                        className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
+                          isUser
+                            ? 'bg-cyan-600 text-white rounded-tr-none shadow-md shadow-cyan-600/10'
+                            : 'bg-slate-900/90 text-slate-200 border border-slate-800 rounded-tl-none'
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap">{m.content}</p>
+
+                        {/* Interactive Task Proposal Card */}
+                        {proposedTask && (
+                          <div className="mt-3 p-3 rounded-xl bg-slate-950/80 border border-cyan-500/30 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] uppercase font-bold tracking-wider text-cyan-400 flex items-center gap-1">
+                                <Rocket className="w-3 h-3" /> Proposed Initiative
+                              </span>
+                              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                {proposedTask.priority || 'MEDIUM'}
+                              </span>
+                            </div>
+                            <div className="font-bold text-slate-100 text-xs">
+                              {proposedTask.title}
+                            </div>
+                            {proposedTask.description && (
+                              <p className="text-[11px] text-slate-400 line-clamp-3">
+                                {proposedTask.description}
+                              </p>
+                            )}
+                            <button
+                              onClick={() => handleOpenTaskConfirm(proposedTask)}
+                              className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-md transition cursor-pointer"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              <span>Initiate This Task</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+
+              {/* Thinking / Typing indicator */}
+              {isThinking && (
+                <div className="flex items-center gap-2 text-xs text-cyan-400 p-2 bg-slate-900/50 rounded-xl border border-slate-800/80 w-fit animate-pulse">
+                  <Bot className="w-3.5 h-3.5 animate-spin" />
+                  <span>{agent.name} is thinking & consulting AI engine...</span>
+                </div>
+              )}
+
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Chat Input Bar */}
+            <div className="p-2.5 bg-slate-900/80 border-t border-slate-800 space-y-2">
+              <div className="flex items-center justify-between text-[11px] px-1">
+                <span className="text-slate-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  Direct AI Chat with <strong className="text-slate-200">{agent.name}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleOpenTaskConfirm()}
+                  className="text-cyan-400 hover:text-cyan-300 text-[10px] font-semibold flex items-center gap-1 transition cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Plan & Initiate Task</span>
+                </button>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendChatMessage();
+                }}
+                className="flex gap-1.5"
+              >
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder={`Talk with ${agent.name}...`}
+                  disabled={isThinking}
+                  className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
+                />
+                <button
+                  type="submit"
+                  disabled={!chatInput.trim() || isThinking}
+                  className="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white text-xs font-semibold flex items-center gap-1 shadow-md shadow-cyan-600/20 transition cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Overview & Telemetry */}
         {activeTab === 'details' && (
-          <>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {/* Quick World Actions */}
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={handleFocus}
-                className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-cyan-400 text-[11px] font-medium transition"
+                className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-cyan-400 text-[11px] font-medium transition cursor-pointer"
               >
                 <Focus className="w-4 h-4 mb-1 text-cyan-400" />
                 Focus Camera
               </button>
               <button
                 onClick={handleReturnDesk}
-                className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-emerald-400 text-[11px] font-medium transition"
+                className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-emerald-400 text-[11px] font-medium transition cursor-pointer"
               >
                 <Home className="w-4 h-4 mb-1 text-emerald-400" />
                 Return to Desk
               </button>
               <button
                 onClick={handleSendToLounge}
-                className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-purple-400 text-[11px] font-medium transition"
+                className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-purple-400 text-[11px] font-medium transition cursor-pointer"
               >
                 <Coffee className="w-4 h-4 mb-1 text-purple-400" />
                 Break Lounge
@@ -205,7 +567,6 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
                 </div>
                 <h4 className="text-xs font-bold text-slate-100">{currentTask.title}</h4>
                 <p className="text-[11px] text-slate-400 line-clamp-2">{currentTask.description}</p>
-                {/* Progress bar */}
                 <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300"
@@ -215,7 +576,7 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
               </div>
             ) : (
               <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-800/80 text-xs text-slate-500 text-center py-4">
-                No task currently assigned. Available for delegation.
+                No task currently assigned. Available for direct assignment.
               </div>
             )}
 
@@ -233,7 +594,7 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
                 <span className="text-slate-200">{agent.personality}</span>
               </div>
 
-              {/* Core Capabilities & Tools */}
+              {/* Capabilities */}
               <div className="space-y-1.5 pt-1">
                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                   <Cpu className="w-3.5 h-3.5 text-cyan-400" />
@@ -260,11 +621,11 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
               </div>
             </div>
 
-            {/* Finished Work / Output */}
+            {/* Finished Work */}
             {agentArtifacts.length > 0 && (
               <div className="space-y-2">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                  <span>Finished Work</span>
+                  <span>Finished Deliverables</span>
                   <span className="text-[10px] font-mono text-cyan-400 font-normal">({agentArtifacts.length})</span>
                 </h4>
                 <div className="space-y-2">
@@ -287,56 +648,14 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
                 </div>
               </div>
             )}
-
-            {/* Simple Activity Stats */}
-            <div className="space-y-1.5">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Activity
-              </h4>
-              <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
-                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 text-[9px] block uppercase">Tasks Done</span>
-                  <strong className="text-emerald-400 font-bold">{agent.stats.tasksCompleted}</strong>
-                </div>
-                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 text-[9px] block uppercase">Messages</span>
-                  <strong className="text-cyan-400 font-bold">{agent.stats.messagesSent}</strong>
-                </div>
-                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-                  <span className="text-slate-500 text-[9px] block uppercase">Active Time</span>
-                  <strong className="text-slate-200 font-bold">{Math.floor(agent.stats.uptimeSeconds / 60)}m</strong>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Message Form */}
-            <form onSubmit={handleSendQuickMessage} className="pt-2">
-              <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                Send Direct Message
-              </label>
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  value={quickMsg}
-                  onChange={(e) => setQuickMsg(e.target.value)}
-                  placeholder={`Send message to ${agent.name}...`}
-                  className="flex-1 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold flex items-center gap-1 transition"
-                >
-                  <Send className="w-3 h-3" />
-                </button>
-              </div>
-            </form>
-          </>
+          </div>
         )}
 
+        {/* Tab 3: Comms Feed */}
         {activeTab === 'messages' && (
-          <div className="space-y-2 font-mono text-xs">
+          <div className="flex-1 overflow-y-auto p-3 space-y-2 font-mono text-xs">
             {recentMessages.length === 0 ? (
-              <div className="text-center py-10 text-slate-600 text-xs">No comms exchanged yet.</div>
+              <div className="text-center py-10 text-slate-600 text-xs">No inter-agent envelopes logged yet.</div>
             ) : (
               recentMessages.map((m) => (
                 <div
@@ -356,9 +675,9 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
           </div>
         )}
 
+        {/* Tab 4: Configuration */}
         {activeTab === 'advanced' && (
-          <div className="space-y-4">
-            {/* AI Provider Status */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-slate-300 flex items-center gap-1.5">
@@ -373,13 +692,13 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
                 <div className="flex items-center justify-between">
                   <span>Provider:</span>
                   <select
-                    value={agent.providerId || 'mock'}
+                    value={agent.providerId || 'gemini'}
                     onChange={(e) => AgentManager.setAgentProvider(agent.id, e.target.value)}
                     className="px-2 py-0.5 rounded bg-slate-950 border border-slate-700 text-cyan-300 font-mono text-[10px] uppercase font-bold focus:outline-none focus:border-cyan-500 cursor-pointer"
                   >
-                    <option value="antigravity">Antigravity (agy)</option>
-                    <option value="gemini">Gemini API</option>
-                    <option value="mock">Local Engine</option>
+                    <option value="gemini">Gemini API (Cloud)</option>
+                    <option value="antigravity">Google Antigravity (Local)</option>
+                    <option value="mock">Local Deterministic</option>
                   </select>
                 </div>
                 {agent.systemRole && (
@@ -389,46 +708,13 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
                   </div>
                 )}
               </div>
-              {agent.thoughtBubble && (
-                <div className="p-2 rounded bg-slate-950/60 border border-slate-800 text-xs text-sky-300 font-mono italic">
-                  💭 {agent.thoughtBubble}
-                </div>
-              )}
-            </div>
-
-            {/* Tools Inventory */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <Wrench className="w-3.5 h-3.5 text-amber-400" />
-                Available Tools
-              </h4>
-              <div className="space-y-1.5">
-                {tools.length === 0 ? (
-                  <div className="text-xs text-slate-500 italic">No tools registered</div>
-                ) : (
-                  tools.map((tl) => (
-                    <div
-                      key={tl.name}
-                      className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80 flex items-start justify-between text-xs"
-                    >
-                      <div>
-                        <div className="font-mono font-bold text-amber-300">{tl.name}</div>
-                        <div className="text-[11px] text-slate-400">{tl.description}</div>
-                      </div>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 uppercase">
-                        {tl.capability}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
             </div>
 
             {/* Diagnostic Session Notes */}
             <div className="space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                 <Database className="w-3.5 h-3.5 text-emerald-400" />
-                Session Notes & Memory
+                Session Memory Notes
               </h4>
               <div className="space-y-1.5 font-mono text-xs">
                 {runtimeMemories.length === 0 ? (
@@ -457,7 +743,16 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
             </div>
           </div>
         )}
-      </div>
-    </aside>
+      </aside>
+
+      {/* Task Confirmation Popup Modal */}
+      <TaskConfirmationModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={handleLaunchConfirmedTask}
+        initialData={pendingTaskData}
+        agents={allAgents}
+      />
+    </>
   );
 };

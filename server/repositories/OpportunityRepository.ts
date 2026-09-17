@@ -152,6 +152,7 @@ export class OpportunityRepository {
         fit_analysis = ?,
         status = ?,
         application_draft_id = ?,
+        source_verification = ?,
         updated_at = ?
       WHERE id = ?
     `);
@@ -174,6 +175,7 @@ export class OpportunityRepository {
       merged.fitAnalysis ? JSON.stringify(merged.fitAnalysis) : null,
       merged.status,
       merged.applicationDraftId || null,
+      merged.sourceVerification || 'UNVERIFIED',
       merged.updatedAt,
       id
     );

@@ -182,6 +182,14 @@ class OpportunityManagerClass {
     return Array.from(this.opportunities.values());
   }
 
+  public loadOpportunities(opps: Opportunity[]): void {
+    for (const opp of opps) {
+      if (opp && opp.id) {
+        this.opportunities.set(opp.id, opp);
+      }
+    }
+  }
+
   public async syncFromBackend(): Promise<void> {
     try {
       const { ApiClient } = await import('../services/ApiClient.ts');

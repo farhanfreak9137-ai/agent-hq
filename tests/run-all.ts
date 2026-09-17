@@ -11,6 +11,7 @@ import { runPhase3bTests } from './phase3b.test.ts';
 import { runLoadTest } from './load.test.ts';
 import { testProspectingAgents } from './prospecting-agents.test.ts';
 import { testOpportunityAndProfileSuite } from './opportunity-profile.test.ts';
+import { testOpportunityDiscoverySuite } from './opportunity-discovery.test.ts';
 
 async function main() {
   console.log('====================================================');
@@ -46,6 +47,9 @@ async function main() {
 
     // Farhan Professional Profile & Opportunity HQ
     await testOpportunityAndProfileSuite();
+
+    // Opportunity Discovery Engine & Adapters Suite
+    await testOpportunityDiscoverySuite();
 
     console.log('\n====================================================');
     console.log('ALL AGENT HQ TEST SUITES PASSED 100%!');

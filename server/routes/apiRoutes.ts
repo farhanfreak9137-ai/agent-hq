@@ -10,6 +10,9 @@ import { createRateLimiter } from '../security/rateLimiter.ts';
 import { EventStreamManager } from './eventStream.ts';
 import { resetDatabase } from '../db/migrations.ts';
 import Database from 'better-sqlite3';
+import { DiscoveryService } from '../../src/opportunity/DiscoveryService.ts';
+import { ArbeitnowOpportunityAdapter } from '../../src/opportunity/adapters/ArbeitnowOpportunityAdapter.ts';
+import { OpportunityManager } from '../../src/opportunity/OpportunityManager.ts';
 
 export interface ProviderCascadeOptions {
   geminiClients?: { client: GoogleGenAI; key: string }[];
@@ -1625,10 +1628,87 @@ Produce a structured JSON response with:
     res.json({ success: true, opportunity: result.opportunity });
   });
 
+  router.post('/opportunities/:id/verify', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+    const { verified = true, verifier = 'Farhan', notes } = req.body || {};
+    const existing = repos.opportunities.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Opportunity not found.' });
+
+    const newVerification = verified ? 'VERIFIED' : 'UNVERIFIED';
+    const evidence = [...(existing.evidence || [])];
+    const verifierNote = `Manually verified by ${verifier}${notes ? `: ${notes}` : ''}`;
+    if (verified && !evidence.includes(verifierNote)) {
+      evidence.push(verifierNote);
+    }
+
+    // Update in-memory DiscoveryService / OpportunityManager & emit EventBus event
+    DiscoveryService.verifyOpportunity(req.params.id, Boolean(verified), verifier, [verifierNote]);
+
+    // Persist explicitly to SQLite repository
+    const updated = repos.opportunities.update(req.params.id, {
+      sourceVerification: newVerification,
+      evidence,
+    });
+
+    res.json({ success: true, opportunity: updated });
+  });
+
   router.delete('/opportunities/:id', authService.optionalAuth, (req: AuthenticatedRequest, res: Response) => {
     const deleted = repos.opportunities.delete(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Opportunity not found.' });
     res.json({ success: true, message: 'Opportunity deleted.' });
+  });
+
+  router.post('/opportunities/discover', authService.optionalAuth, async (_req: AuthenticatedRequest, res: Response) => {
+    try {
+      const currentStatus = DiscoveryService.getStatus();
+      if (currentStatus.isRunning) {
+        return res.status(409).json({
+          error: 'A discovery run is already active.',
+          conflict: true,
+          currentRunId: currentStatus.currentRunId,
+        });
+      }
+
+      // Ensure public adapter is registered if no adapter registered
+      if (DiscoveryService.getAdapters().length === 0) {
+        DiscoveryService.registerAdapter(new ArbeitnowOpportunityAdapter());
+      }
+
+      // Sync SQLite opportunities into OpportunityManager so duplicate detection is complete
+      const existingInDb = repos.opportunities.findAll();
+      OpportunityManager.loadOpportunities(existingInDb);
+
+      const result = await DiscoveryService.runDiscovery();
+
+      // Persist newly discovered opportunities to SQLite repository
+      for (const opp of OpportunityManager.getAllOpportunities()) {
+        const existing = repos.opportunities.findById(opp.id);
+        if (!existing) {
+          repos.opportunities.create(opp);
+        } else if (existing.status !== opp.status || existing.sourceVerification !== opp.sourceVerification) {
+          repos.opportunities.update(opp.id, {
+            status: opp.status,
+            matchedSkills: opp.matchedSkills,
+            missingSkills: opp.missingSkills,
+            evidence: opp.evidence,
+            fitAnalysis: opp.fitAnalysis,
+            sourceVerification: opp.sourceVerification,
+          });
+        }
+      }
+
+      res.json({ success: true, ...result });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('CONCURRENCY_CONFLICT')) {
+        return res.status(409).json({ error: msg, conflict: true });
+      }
+      res.status(500).json({ error: msg });
+    }
+  });
+
+  router.get('/opportunities/discover/status', (_req: Request, res: Response) => {
+    res.json(DiscoveryService.getStatus());
   });
 
   // ----------------------------------------------------

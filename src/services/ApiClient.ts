@@ -324,6 +324,37 @@ export class ApiClient {
     });
   }
 
+  public async verifyOpportunity(id: string, verified: boolean = true, verifier: string = 'Farhan', notes?: string): Promise<any | null> {
+    return this.fetchJson(`/api/opportunities/${id}/verify`, {
+      method: 'POST',
+      body: JSON.stringify({ verified, verifier, notes }),
+    });
+  }
+
+  public async discoverOpportunities(): Promise<{
+    success: boolean;
+    runId?: string;
+    discoveredCount?: number;
+    duplicateCount?: number;
+    failureCount?: number;
+    sourceStatus?: Record<string, any>;
+    error?: string;
+    conflict?: boolean;
+  } | null> {
+    return this.fetchJson('/api/opportunities/discover', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
+  public async getDiscoveryStatus(): Promise<{
+    isRunning: boolean;
+    currentRunId: string | null;
+    lastRunResult: any | null;
+  } | null> {
+    return this.fetchJson('/api/opportunities/discover/status');
+  }
+
   // 11. Tailored Applications
   public async getApplications(status?: string): Promise<JobApplication[] | null> {
     const q = status ? `?status=${status}` : '';

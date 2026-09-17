@@ -71,8 +71,15 @@ export type SimulationEventType =
   | 'profile.updated'
   | 'profile.approval.requested'
   | 'opportunity.discovered'
+  | 'opportunity.normalized'
+  | 'opportunity.duplicate_detected'
   | 'opportunity.verified'
+  | 'opportunity.verification.completed'
+  | 'opportunity.verification.failed'
+  | 'opportunity.eligibility.checked'
   | 'opportunity.matched'
+  | 'opportunity.discovery.completed'
+  | 'opportunity.discovery.failed'
   | 'application.drafted'
   | 'application.approval.requested'
   | 'application.approved'
@@ -515,12 +522,28 @@ export interface ProfileEvent extends BaseEvent {
 }
 
 export interface OpportunityEvent extends BaseEvent {
-  type: 'opportunity.discovered' | 'opportunity.verified' | 'opportunity.matched';
-  opportunityId: string;
-  title: string;
-  organization: string;
+  type:
+    | 'opportunity.discovered'
+    | 'opportunity.normalized'
+    | 'opportunity.duplicate_detected'
+    | 'opportunity.verified'
+    | 'opportunity.verification.completed'
+    | 'opportunity.verification.failed'
+    | 'opportunity.eligibility.checked'
+    | 'opportunity.matched'
+    | 'opportunity.discovery.completed'
+    | 'opportunity.discovery.failed';
+  opportunityId?: string;
+  title?: string;
+  organization?: string;
   agentId?: string;
   fitAnalysis?: unknown;
+  runId?: string;
+  sourceId?: string;
+  discoveredCount?: number;
+  duplicateCount?: number;
+  failureCount?: number;
+  error?: string;
 }
 
 export interface ApplicationEvent extends BaseEvent {

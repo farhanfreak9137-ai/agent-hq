@@ -28,6 +28,8 @@ import {
   SourceVerification,
 } from '../types/index.ts';
 import { OpportunityManager } from '../opportunity/OpportunityManager.ts';
+import { DiscoveryService } from '../opportunity/DiscoveryService.ts';
+import { ApiClient } from '../services/ApiClient.ts';
 import { EventBus } from '../events/EventBus.ts';
 
 interface OpportunityHQModalProps {
@@ -61,7 +63,14 @@ export const OpportunityHQModal: React.FC<OpportunityHQModalProps> = ({
   const [activeTab, setActiveTab] = useState<CategoryTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [verificationFilter, setVerificationFilter] = useState<string>('ALL');
   const [remoteOnly, setRemoteOnly] = useState<boolean>(false);
+  const [isDiscovering, setIsDiscovering] = useState<boolean>(false);
+  const [lastDiscoveryInfo, setLastDiscoveryInfo] = useState<{
+    timestamp: number;
+    discovered: number;
+    duplicates: number;
+  } | null>(null);
 
   // Application Review Gate Modal State
   const [reviewingAppId, setReviewingAppId] = useState<string | null>(null);
@@ -141,6 +150,62 @@ export const OpportunityHQModal: React.FC<OpportunityHQModalProps> = ({
     }
   };
 
+  const handleRunDiscovery = async () => {
+    setIsDiscovering(true);
+    try {
+      // First try backend API
+      const apiRes = await ApiClient.getInstance().discoverOpportunities();
+      if (apiRes && apiRes.success) {
+        await OpportunityManager.syncFromBackend();
+        refreshState();
+        setLastDiscoveryInfo({
+          timestamp: Date.now(),
+          discovered: apiRes.discoveredCount || 0,
+          duplicates: apiRes.duplicateCount || 0,
+        });
+        showFeedback(`Discovery completed: ${apiRes.discoveredCount || 0} new opportunities, ${apiRes.duplicateCount || 0} duplicates skipped.`);
+      } else if (apiRes && apiRes.conflict) {
+        showFeedback('A discovery run is already active.', 'error');
+      } else {
+        // Fallback to local discovery
+        const localRes = await DiscoveryService.runDiscovery();
+        refreshState();
+        setLastDiscoveryInfo({
+          timestamp: Date.now(),
+          discovered: localRes.discoveredCount,
+          duplicates: localRes.duplicateCount,
+        });
+        showFeedback(`Discovery completed: ${localRes.discoveredCount} new opportunities, ${localRes.duplicateCount} duplicates skipped.`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showFeedback(`Discovery failed: ${msg}`, 'error');
+    } finally {
+      setIsDiscovering(false);
+    }
+  };
+
+  const handleVerifySource = async (oppId: string) => {
+    const opp = opportunities.find((o) => o.id === oppId);
+    const confirmed = typeof window !== 'undefined' && window.confirm
+      ? window.confirm(`Confirm manual verification: Have you reviewed "${opp?.title || 'this opportunity'}" at the original source to verify its authenticity?`)
+      : true;
+    if (!confirmed) return;
+
+    try {
+      await ApiClient.getInstance().verifyOpportunity(oppId, true, 'Farhan', 'Manual verification confirmed by Farhan');
+    } catch {
+      // Fallback to in-memory if offline
+    }
+
+    const res = DiscoveryService.verifyOpportunity(oppId, true, 'Farhan', ['Manual verification confirmed by Farhan']);
+    if (res.success) {
+      await OpportunityManager.syncFromBackend();
+      refreshState();
+      showFeedback('Source explicitly audited & marked as VERIFIED.');
+    }
+  };
+
   // Filter opportunities
   const filteredOpps = opportunities.filter((opp) => {
     if (activeTab !== 'all' && activeTab !== 'applications' && activeTab !== 'deadlines') {
@@ -149,6 +214,7 @@ export const OpportunityHQModal: React.FC<OpportunityHQModalProps> = ({
     if (activeTab === 'deadlines' && !opp.deadline) return false;
     if (remoteOnly && !opp.remote) return false;
     if (statusFilter !== 'ALL' && opp.status !== statusFilter) return false;
+    if (verificationFilter !== 'ALL' && opp.sourceVerification !== verificationFilter) return false;
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -204,24 +270,24 @@ export const OpportunityHQModal: React.FC<OpportunityHQModalProps> = ({
     switch (verification) {
       case 'DEMO':
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border bg-amber-500/20 text-amber-300 border-amber-500/40 tracking-wide inline-flex items-center gap-1 shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-            Demo Data
+          <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border bg-purple-500/20 text-purple-300 border-purple-500/40 tracking-wide inline-flex items-center gap-1 shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
+            DEMO DATA
           </span>
         );
       case 'VERIFIED':
         return (
           <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border bg-emerald-500/20 text-emerald-300 border-emerald-500/40 tracking-wide inline-flex items-center gap-1 shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            Verified Source
+            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+            VERIFIED SOURCE
           </span>
         );
       case 'UNVERIFIED':
       default:
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase border bg-slate-800 text-slate-400 border-slate-700 tracking-wide inline-flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
-            Unverified
+          <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border bg-amber-500/15 text-amber-300 border-amber-500/40 tracking-wide inline-flex items-center gap-1 shadow-sm">
+            <AlertTriangle className="w-3 h-3 text-amber-400" />
+            UNVERIFIED SOURCE
           </span>
         );
     }
@@ -253,6 +319,24 @@ export const OpportunityHQModal: React.FC<OpportunityHQModalProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
+            {lastDiscoveryInfo && (
+              <span className="text-[11px] text-slate-400 font-mono hidden md:inline-block">
+                Last: {new Date(lastDiscoveryInfo.timestamp).toLocaleTimeString()} (+{lastDiscoveryInfo.discovered} new, {lastDiscoveryInfo.duplicates} dup)
+              </span>
+            )}
+            <button
+              onClick={handleRunDiscovery}
+              disabled={isDiscovering}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-sm ${
+                isDiscovering
+                  ? 'bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-700'
+                  : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-cyan-500/20'
+              }`}
+              title="Run external opportunity discovery engine"
+            >
+              <Compass className={`w-3.5 h-3.5 ${isDiscovering ? 'animate-spin text-cyan-400' : ''}`} />
+              {isDiscovering ? 'Discovering...' : 'Run Discovery'}
+            </button>
             {feedbackMessage && (
               <span
                 className={`px-3 py-1 rounded-lg text-xs font-semibold border ${
@@ -380,6 +464,17 @@ export const OpportunityHQModal: React.FC<OpportunityHQModalProps> = ({
                 <option value="AWAITING_APPROVAL">Awaiting Approval</option>
                 <option value="SUBMITTED">Submitted</option>
               </select>
+
+              <select
+                value={verificationFilter}
+                onChange={(e) => setVerificationFilter(e.target.value)}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-xs outline-none"
+              >
+                <option value="ALL">All Sources</option>
+                <option value="VERIFIED">Verified Source</option>
+                <option value="UNVERIFIED">Unverified Source</option>
+                <option value="DEMO">Demo Data</option>
+              </select>
             </div>
           </div>
         </div>
@@ -502,7 +597,7 @@ export const OpportunityHQModal: React.FC<OpportunityHQModalProps> = ({
 
                       {/* Transparent Fit Analysis (if run) */}
                       {opp.fitAnalysis && (
-                        <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800/80 space-y-1 text-[11px]">
+                        <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800/80 space-y-1.5 text-[11px]">
                           <div className="flex items-center justify-between font-bold">
                             <span className="text-cyan-300">Profile Requirement Match</span>
                             <span className="font-mono text-emerald-400">{opp.fitAnalysis.matchPercentage}%</span>
@@ -511,6 +606,26 @@ export const OpportunityHQModal: React.FC<OpportunityHQModalProps> = ({
                             <span className="text-slate-400 block text-[10px] truncate">
                               Evidence: {opp.evidence.join(', ')}
                             </span>
+                          )}
+                          {opp.fitAnalysis.eligibilityChecks && opp.fitAnalysis.eligibilityChecks.length > 0 && (
+                            <div className="pt-1 border-t border-slate-900 space-y-0.5 text-[10px]">
+                              {opp.fitAnalysis.eligibilityChecks.map((ec, eci) => (
+                                <div key={eci} className="flex items-center justify-between text-slate-400">
+                                  <span className="truncate pr-1">{ec.criterion}</span>
+                                  <span
+                                    className={`px-1 rounded text-[9px] font-bold ${
+                                      ec.status === 'MATCH'
+                                        ? 'text-emerald-400 bg-emerald-500/10'
+                                        : ec.status === 'GAP'
+                                        ? 'text-rose-400 bg-rose-500/10'
+                                        : 'text-amber-400 bg-amber-500/10'
+                                    }`}
+                                  >
+                                    {ec.status}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
                       )}
@@ -523,6 +638,16 @@ export const OpportunityHQModal: React.FC<OpportunityHQModalProps> = ({
                       </span>
 
                       <div className="flex items-center gap-1.5">
+                        {opp.sourceVerification === 'UNVERIFIED' && (
+                          <button
+                            onClick={() => handleVerifySource(opp.id)}
+                            className="px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1"
+                            title="Verify source legitimacy after manual audit"
+                          >
+                            <ShieldCheck className="w-3 h-3" />
+                            Verify
+                          </button>
+                        )}
                         <button
                           onClick={() => handleMatchOpportunity(opp.id)}
                           className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition cursor-pointer"

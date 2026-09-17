@@ -1,6 +1,6 @@
 # Agent HQ
 
-A multi-agent orchestration and operations platform featuring persistent state, opportunity intelligence, professional profile grounding, strict human approval boundaries, and event-driven telemetry.
+A multi-agent orchestration and operations platform featuring persistent state, opportunity intelligence, candidate profile grounding, strict human approval boundaries, and event-driven telemetry.
 
 ```mermaid
 graph TD
@@ -26,6 +26,16 @@ graph TD
         Prosp --> Outreach[Outreach Drafting (Human Gate)]
     end
 ```
+
+---
+
+## Platform Interface
+
+### Multi-Agent DAG Operations
+![Multi-Agent DAG Operations](assets/screenshots/browser_master_aegis_completed.png)
+
+### Real-Time Telemetry & Agent Runtime
+![Live Activity Feed & Agent Runtime](assets/screenshots/activity_feed_runtime_events.png)
 
 ---
 
@@ -78,6 +88,9 @@ Candidate Review & Tailored Application Preparation
 
 > **IMPORTANT**: Discovered opportunities are **NEVER** automatically marked as verified. All discovered postings enter the pipeline with `sourceVerification = 'UNVERIFIED'`. Changing an opportunity to `VERIFIED` requires an explicit, confirmed action by a human operator after auditing the canonical employer source.
 
+### Opportunity HQ Pipeline & Verification Interface
+![Opportunity HQ Discovery & Verification](assets/screenshots/opportunity_hq_pipeline.png)
+
 ---
 
 ## Security & Integrity Model
@@ -91,6 +104,18 @@ Agent HQ enforces strict security boundaries designed for safe human-in-the-loop
 5. **Deterministic Fit Analysis**: Matching percentage uses the transparent formula `Math.round(matchedRequirements / totalRequirements * 100)`. Unmatched requirements are explicitly surfaced as gaps.
 6. **Provenance Preservation**: Verification preserves original discovery metadata (`sourceId`, `sourceName`, `sourceUrl`, `applicationUrl`, `discoveredAt`).
 7. **Local Data Ownership**: SQLite persistence keeps profile facts, opportunity records, audit logs, and provider configurations on the user's system without third-party leakages.
+
+---
+
+## Documentation
+
+For technical deep-dives into subsystems, database schemas, security guarantees, and execution manuals:
+
+* [Architecture Overview](docs/architecture.md) — Multi-tier agent topology, execution lifecycle, and concurrency flow.
+* [Database & Storage](docs/database.md) — SQLite schema, WAL mode, persistence guarantees, and migrations.
+* [Security Model](docs/security.md) — Human approval boundaries, anti-fabrication gates, and data isolation.
+* [Provider Adapters](docs/providers.md) — Multi-provider routing, local engine fallbacks, and adapter contracts.
+* [Operator & Execution Manual](guide.md) — Comprehensive operations guide for dispatching tasks and controlling agents.
 
 ---
 
@@ -111,7 +136,7 @@ All platform subsystems are verified via an automated test harness covering unit
   - Adapter fault isolation & error resilience
   - Real public adapter integration (Arbeitnow API)
   - Verification gate negative paths & provenance preservation
-* **Farhan Professional Profile & Opportunity HQ**: **27/27 tests passing (100%)**
+* **Candidate Professional Profile Grounding (Reference Implementation: Farhan Profile)**: **27/27 tests passing (100%)**
   - Authoritative profile CRUD & WAL persistence
   - Direct mutation rejection across repos & managers
   - Field visibility filtering (`PUBLIC`, `APPLICATION_ONLY`, `FULL`)
@@ -158,12 +183,14 @@ All platform subsystems are verified via an automated test harness covering unit
 
 3. Run the development environment:
    ```bash
-   # Terminal 1: Start backend API server
+   # Terminal 1: Start backend API server (runs on http://localhost:3001)
    npm run server
 
-   # Terminal 2: Start frontend UI
+   # Terminal 2: Start frontend UI (runs on http://localhost:3005)
    npm run dev
    ```
+
+   Open [http://localhost:3005](http://localhost:3005) in your browser to access the Agent HQ dashboard.
 
 4. Run the full test suite:
    ```bash
@@ -171,3 +198,9 @@ All platform subsystems are verified via an automated test harness covering unit
    npm run lint
    npx tsc --noEmit
    ```
+
+---
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

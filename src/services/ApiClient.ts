@@ -411,5 +411,109 @@ export class ApiClient {
       method: 'POST',
     });
   }
+
+  // 12. Gmail & Cold Outreach
+  public async getEmailConfig(): Promise<any | null> {
+    return this.fetchJson('/api/email/config');
+  }
+
+  public async updateEmailConfig(config: any): Promise<any | null> {
+    return this.fetchJson('/api/email/config', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  public async testEmailConnection(): Promise<{ success: boolean; message: string } | null> {
+    return this.fetchJson('/api/email/test', {
+      method: 'POST',
+    });
+  }
+
+  public async getOutreachEmails(): Promise<any[] | null> {
+    return this.fetchJson('/api/outreach/emails');
+  }
+
+  public async draftOutreachFromSheet(jobs?: any[]): Promise<any | null> {
+    return this.fetchJson('/api/outreach/draft-from-sheet', {
+      method: 'POST',
+      body: JSON.stringify({ jobs }),
+    });
+  }
+
+  public async sendOutreachEmails(emailIds?: string[], delaySeconds?: number): Promise<any | null> {
+    return this.fetchJson('/api/outreach/send', {
+      method: 'POST',
+      body: JSON.stringify({ emailIds, delaySeconds }),
+    });
+  }
+
+  public async sendSingleOutreachEmail(id: string): Promise<any | null> {
+    return this.fetchJson(`/api/outreach/emails/${id}/send`, {
+      method: 'POST',
+    });
+  }
+
+  public async updateOutreachEmail(id: string, updates: any): Promise<any | null> {
+    return this.fetchJson(`/api/outreach/emails/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  public async deleteOutreachEmail(id: string): Promise<any | null> {
+    return this.fetchJson(`/api/outreach/emails/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // 13. Incoming Replies & Recruiter CRM
+  public async getReplies(): Promise<any[] | null> {
+    return this.fetchJson('/api/replies');
+  }
+
+  public async pollReplies(): Promise<any | null> {
+    return this.fetchJson('/api/replies/poll', {
+      method: 'POST',
+    });
+  }
+
+  public async sendReply(id: string): Promise<any | null> {
+    return this.fetchJson(`/api/replies/${id}/send`, {
+      method: 'POST',
+    });
+  }
+
+  public async updateReply(id: string, updates: any): Promise<any | null> {
+    return this.fetchJson(`/api/replies/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  public async deleteReply(id: string): Promise<any | null> {
+    return this.fetchJson(`/api/replies/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // 14. Mobile Discord Alerts
+  public async getNotificationConfig(): Promise<any | null> {
+    return this.fetchJson('/api/notifications/config');
+  }
+
+  public async updateNotificationConfig(config: any): Promise<any | null> {
+    return this.fetchJson('/api/notifications/config', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  public async testNotificationAlert(): Promise<{ success: boolean; message: string } | null> {
+    return this.fetchJson('/api/notifications/test', {
+      method: 'POST',
+    });
+  }
 }
+
 

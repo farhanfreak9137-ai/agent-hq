@@ -17,6 +17,8 @@ import {
   Plus,
   Bot,
   AlertCircle,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { AgentModel, TaskPriority, MessageModel } from '../types/index.ts';
 import { MessageBus } from '../communication/MessageBus.ts';
@@ -61,6 +63,14 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
     priority: 'MEDIUM',
     assignedAgentId: agent?.id || 'boss',
   });
+
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
+  const handleCopyMessage = (content: string, id: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedMessageId(id);
+    setTimeout(() => setCopiedMessageId(null), 2000);
+  };
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -418,17 +428,37 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
                       key={m.id}
                       className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-1`}
                     >
-                      <div className="flex items-center gap-1 text-[10px] text-slate-500 px-1">
-                        <span className="font-semibold text-slate-400">
-                          {isUser ? 'You (Farhan)' : agent.name}
-                        </span>
-                        <span>•</span>
-                        <span>
-                          {new Date(m.timestamp).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
+                      <div className="flex items-center justify-between w-full max-w-[88%] text-[10px] text-slate-500 px-1">
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold text-slate-400">
+                            {isUser ? 'You (Farhan)' : agent.name}
+                          </span>
+                          <span>•</span>
+                          <span>
+                            {new Date(m.timestamp).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyMessage(m.content, m.id)}
+                          title="Copy message text"
+                          className="flex items-center gap-1 text-slate-500 hover:text-cyan-300 px-1.5 py-0.5 rounded hover:bg-slate-800/80 transition cursor-pointer"
+                        >
+                          {copiedMessageId === m.id ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-400" />
+                              <span className="text-[9px] text-emerald-400 font-mono">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span className="text-[9px]">Copy</span>
+                            </>
+                          )}
+                        </button>
                       </div>
 
                       <div
@@ -739,7 +769,21 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
                     <span className="font-semibold text-cyan-300">
                       {m.fromAgentId.toUpperCase()} → {m.toAgentId.toUpperCase()}
                     </span>
-                    <span>{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <div className="flex items-center gap-2">
+                      <span>{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyMessage(m.content, m.id)}
+                        title="Copy message text"
+                        className="flex items-center gap-1 text-slate-500 hover:text-cyan-300 px-1.5 py-0.5 rounded hover:bg-slate-800/80 transition cursor-pointer"
+                      >
+                        {copiedMessageId === m.id ? (
+                          <Check className="w-3 h-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                   <p className="text-[11px] text-slate-200">{m.content}</p>
                 </div>

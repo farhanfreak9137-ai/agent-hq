@@ -612,6 +612,9 @@ export interface ProfileIdentity {
   location: string;
   portfolioUrl: string;
   githubUrl: string;
+  linkedInUrl?: string;
+  phone?: string;
+  timezone?: string;
   bio?: string;
   primaryInterests?: string[];
   visibility: Record<string, ProfileVisibility>;
@@ -721,10 +724,16 @@ export interface ProfilePreferences {
   targetIndustries: string[];
   targetLocations: string[];
   remotePreference: 'remote_only' | 'hybrid' | 'onsite' | 'flexible';
+  targetRoles?: string[];
+  minSalary?: string;
+  timezoneRequirements?: string;
+  dealBreakers?: string[];
+  submissionStrategy?: 'human_in_the_loop' | 'autonomous';
   visibility: ProfileVisibility;
 }
 
 export interface ProfileDocuments {
+  masterResumeMarkdown?: string;
   resumeVersions: Array<{
     id: string;
     name: string;

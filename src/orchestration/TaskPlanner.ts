@@ -380,6 +380,57 @@ export class TaskPlanner {
   }
 
   /**
+   * Constructs a targeted team execution pipeline for explicitly selected agents.
+   */
+  public createTeamPlan(goal: string, description: string | undefined, agentIds: string[]): TaskGraph {
+    const graph = new TaskGraph(
+      generateId('graph'),
+      goal,
+      generateId('team_mission')
+    );
+
+    let prevNodeId: string | null = null;
+    for (let i = 0; i < agentIds.length; i++) {
+      const agentId = agentIds[i];
+      const agent = AgentManager.getById(agentId);
+      const agentName = agent?.name || agentId.toUpperCase();
+      const roleName = agent?.role || 'Specialist';
+      const nodeId = `node_team_${agentId}_` + generateId('n');
+
+      let stepAction = 'Execution Phase';
+      if (roleName.toLowerCase().includes('research')) stepAction = 'Research & Context Gathering';
+      else if (roleName.toLowerCase().includes('writer') || roleName.toLowerCase().includes('author')) stepAction = 'Draft & Produce Deliverables';
+      else if (roleName.toLowerCase().includes('architect') || roleName.toLowerCase().includes('coder') || roleName.toLowerCase().includes('code')) stepAction = 'Technical Implementation & Code';
+      else if (roleName.toLowerCase().includes('review') || roleName.toLowerCase().includes('audit') || roleName.toLowerCase().includes('test')) stepAction = 'Quality Audit & Fact-Check';
+      else if (roleName.toLowerCase().includes('strateg')) stepAction = 'Strategic Analysis & Modeling';
+      else if (roleName.toLowerCase().includes('security')) stepAction = 'Security & Vulnerability Audit';
+      else if (roleName.toLowerCase().includes('design')) stepAction = 'Design & Layout Specification';
+
+      graph.addNode({
+        id: nodeId,
+        taskId: generateId('task'),
+        title: `${agentName}: ${stepAction}`,
+        description: `${agentName} (${roleName}) executes Stage ${i + 1} of custom collaborative team workflow for: ${description || goal}`,
+        assignedAgentId: agentId,
+        dependencies: prevNodeId ? [prevNodeId] : [],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+
+      if (prevNodeId) {
+        graph.addEdge(prevNodeId, nodeId);
+      }
+      prevNodeId = nodeId;
+    }
+
+    const validation = graph.validate();
+    if (!validation.valid) throw new Error(`Custom team DAG invalid: ${validation.errors.join('; ')}`);
+    return graph;
+  }
+
+  /**
    * Dynamically plans and decomposes a free-form mission goal into a multi-agent DAG.
    */
   /**
@@ -396,14 +447,17 @@ export class TaskPlanner {
     const fullText = `${goal} ${description || ''}`.toLowerCase();
 
     // 1. Detect required specialist domains
-    const needsResearch = /research|analyze|analysis|investigate|benchmark|competitor|market|docs|documentation|spec|find|explore|evaluate|study|papers|survey/.test(fullText);
+    const needsCreativeWriting = /novel|chapter|episode|story|fiction|narrative|script|prose|poem|character/i.test(fullText);
+    const needsDocumentGeneration = /case study|portfolio|whitepaper|report|manual|handbook|guide|documentation|docx|specification/i.test(fullText);
+    const needsSpreadsheet = /excel|spreadsheet|xlsx|csv|tabular|financial model|budget sheet|rows and columns/i.test(fullText);
+    const needsResearch = /research|analyze|analysis|investigate|benchmark|competitor|market|find|explore|evaluate|study|papers|survey/.test(fullText);
     const needsDesign = /design|ui|ux|frontend|css|layout|color|theme|style|visual|landing|component|button|interface|mockup|responsive/.test(fullText);
-    const needsCoding = /code|implement|build|create|develop|refactor|fix|bug|api|endpoint|backend|database|module|function|service|logic|feature|algorithm|script|handler|pipeline|patch/.test(fullText);
+    const needsCoding = /code|implement|build|create|develop|refactor|fix|bug|api|endpoint|backend|database|module|function|service|logic|feature|algorithm|script|handler|patch/.test(fullText);
     const needsSecurity = /security|audit|vulnerability|cve|auth|token|jwt|encryption|cipher|firewall|zero-trust|permission|sanitize|leak|exploit|penetration|secret/.test(fullText);
     const needsTesting = /test|testing|qa|fuzz|stress|e2e|unit|integration|coverage|chaos|benchmark|load|validate|regression/.test(fullText);
     const needsReview = /review|pr|pull request|inspect|gatekeeper|standards|compliance|quality|lint|verify/.test(fullText);
-    const needsProspecting = /prospect|prospecting|lead|leads|outreach|crm|client|clients|sales|opportunity|pipeline|customer|customers|pitch|business|businesses|qualif/.test(fullText);
     const needsJobPipeline = /internship|job application|apply for|career opportunity|fellowship|job opening|hackathon application|scholarship application/.test(fullText) && !/client|sales|prospecting|lead generation/.test(fullText);
+    const needsProspecting = /prospect|prospecting|lead|leads|outreach|crm|client|clients|sales|business|businesses|pitch/i.test(fullText) && !needsDocumentGeneration && !needsCreativeWriting && !needsSpreadsheet;
 
     // If job / internship opportunity workflow is detected, construct the career application pipeline:
     // ATLAS (Researcher) -> STRATEGIST (Profile Matcher) -> QUILL (Resume Customizer) -> OUTREACH (Application Drafter) -> ECHO (Reviewer) -> BOSS (Approval Gate)
@@ -516,6 +570,129 @@ export class TaskPlanner {
       if (!validation.valid) {
         throw new Error(`Dynamic career DAG invalid: ${validation.errors.join('; ')}`);
       }
+      return graph;
+    }
+
+    // Creative Writing Pipeline: Novel chapters, stories, episodes
+    if (needsCreativeWriting) {
+      const draftId = 'node_creative_draft_' + generateId('n');
+      graph.addNode({
+        id: draftId,
+        taskId: generateId('task'),
+        title: `Draft Chapter / Episode: ${goal.substring(0, 32)}`,
+        description: `QUILL drafts rich narrative prose, dialogue, and pacing for "${description || goal}". Automatically generates and saves workspace file.`,
+        assignedAgentId: 'quill',
+        dependencies: [],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+
+      const editId = 'node_creative_edit_' + generateId('n');
+      graph.addNode({
+        id: editId,
+        taskId: generateId('task'),
+        title: `Literary Review & Polish`,
+        description: `ECHO reviews narrative tone, emotional resonance, and consistency.`,
+        assignedAgentId: 'echo',
+        dependencies: [draftId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 1,
+      });
+      graph.addEdge(draftId, editId);
+
+      const validation = graph.validate();
+      if (!validation.valid) throw new Error(`Creative DAG invalid: ${validation.errors.join('; ')}`);
+      return graph;
+    }
+
+    // Document Generation Pipeline: Case Studies, Portfolios, Reports, DOCX
+    if (needsDocumentGeneration) {
+      const researchId = 'node_doc_research_' + generateId('n');
+      graph.addNode({
+        id: researchId,
+        taskId: generateId('task'),
+        title: `Discovery & Evidence Synthesis`,
+        description: `ATLAS discovers verified facts, metrics, and architecture patterns from workspace and repository for "${description || goal}".`,
+        assignedAgentId: 'atlas',
+        dependencies: [],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+
+      const authorId = 'node_doc_author_' + generateId('n');
+      graph.addNode({
+        id: authorId,
+        taskId: generateId('task'),
+        title: `Author Document & Generate Workspace Deliverable`,
+        description: `QUILL synthesizes research into a polished document / case study, saving real files (Markdown & Word .docx) to workspace/.`,
+        assignedAgentId: 'quill',
+        dependencies: [researchId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+      graph.addEdge(researchId, authorId);
+
+      const auditId = 'node_doc_audit_' + generateId('n');
+      graph.addNode({
+        id: auditId,
+        taskId: generateId('task'),
+        title: `Technical Integrity & Audit Gate`,
+        description: `ECHO verifies document claims against code invariants to ensure 100% verified accuracy.`,
+        assignedAgentId: 'echo',
+        dependencies: [authorId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 1,
+      });
+      graph.addEdge(authorId, auditId);
+
+      const validation = graph.validate();
+      if (!validation.valid) throw new Error(`Document DAG invalid: ${validation.errors.join('; ')}`);
+      return graph;
+    }
+
+    // Spreadsheet Pipeline: Excel, CSV, Financial / Benchmark Data
+    if (needsSpreadsheet) {
+      const researchId = 'node_sheet_res_' + generateId('n');
+      graph.addNode({
+        id: researchId,
+        taskId: generateId('task'),
+        title: `Data Discovery & Tabular Aggregation`,
+        description: `ATLAS gathers numerical data, benchmark scores, and metric points for "${description || goal}".`,
+        assignedAgentId: 'atlas',
+        dependencies: [],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+
+      const sheetId = 'node_sheet_gen_' + generateId('n');
+      graph.addNode({
+        id: sheetId,
+        taskId: generateId('task'),
+        title: `Model Dataset & Generate Excel (.xlsx)`,
+        description: `STRATEGIST models data tables and writes native Microsoft Excel spreadsheet to workspace/.`,
+        assignedAgentId: 'strategist',
+        dependencies: [researchId],
+        dependents: [],
+        status: 'pending',
+        retryCount: 0,
+        maxRetries: 2,
+      });
+      graph.addEdge(researchId, sheetId);
+
+      const validation = graph.validate();
+      if (!validation.valid) throw new Error(`Spreadsheet DAG invalid: ${validation.errors.join('; ')}`);
       return graph;
     }
 

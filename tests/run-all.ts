@@ -51,6 +51,13 @@ async function main() {
     // Opportunity Discovery Engine & Adapters Suite
     await testOpportunityDiscoverySuite();
 
+    // Physical Workspace File Engine & Intent Decomposition Suite
+    console.log('====================================================');
+    console.log('AGENT HQ — Physical Workspace File Engine & Intent Suite');
+    console.log('====================================================');
+    const { execSync } = await import('child_process');
+    execSync('npx tsx tests/workspace-files.test.ts', { stdio: 'inherit' });
+
     console.log('\n====================================================');
     console.log('ALL AGENT HQ TEST SUITES PASSED 100%!');
     console.log('====================================================');

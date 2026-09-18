@@ -14,6 +14,7 @@ import {
   Briefcase,
   User,
   Settings,
+  Folder,
 } from 'lucide-react';
 import { AgentModel, TaskModel, ProviderHealth } from '../types/index.ts';
 import { ProviderRegistry } from '../agents/ProviderRegistry.ts';
@@ -34,6 +35,7 @@ interface TopBarProps {
   onOpenDispatchMission?: () => void;
   onOpenCreateTask: () => void;
   onOpenTaskBoard: () => void;
+  onOpenWorkspaceFiles?: () => void;
   onOpenMissionDashboard?: () => void;
   onOpenInbox?: () => void;
   onOpenOpportunityHQ?: () => void;
@@ -58,6 +60,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onReset,
   onOpenCreateTask,
   onOpenTaskBoard,
+  onOpenWorkspaceFiles,
   onOpenMissionDashboard,
   onOpenInbox,
   onOpenOpportunityHQ,
@@ -217,6 +220,18 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span className="text-[10px] font-mono text-slate-400">({tasks.length})</span>
           )}
         </button>
+
+        {/* Workspace Files Button */}
+        {onOpenWorkspaceFiles && (
+          <button
+            onClick={onOpenWorkspaceFiles}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-700/60 text-xs font-medium transition cursor-pointer"
+            title="Browse Real Workspace Files on PC"
+          >
+            <Folder className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline font-semibold">Files</span>
+          </button>
+        )}
 
         {/* Operations Button */}
         {onOpenMissionDashboard && (

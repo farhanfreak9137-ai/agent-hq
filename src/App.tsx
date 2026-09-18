@@ -24,6 +24,7 @@ import { EmailManager } from './email/EmailManager.ts';
 import { ExecutiveEmail } from './email/EmailTypes.ts';
 import { ApiClient } from './services/ApiClient.ts';
 import { EventStreamClient } from './services/EventStreamClient.ts';
+import { WorkspaceFilesModal } from './components/WorkspaceFilesModal.tsx';
 
 export default function App() {
   // Core World, Camera & Simulation instances
@@ -49,6 +50,7 @@ export default function App() {
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState<boolean>(false);
   const [isDispatchMissionOpen, setIsDispatchMissionOpen] = useState<boolean>(false);
   const [isTaskBoardOpen, setIsTaskBoardOpen] = useState<boolean>(false);
+  const [isWorkspaceFilesOpen, setIsWorkspaceFilesOpen] = useState<boolean>(false);
   const [isMissionDashboardOpen, setIsMissionDashboardOpen] = useState<boolean>(false);
   const [isInboxOpen, setIsInboxOpen] = useState<boolean>(false);
   const [isOpportunityHQOpen, setIsOpportunityHQOpen] = useState<boolean>(false);
@@ -230,6 +232,7 @@ export default function App() {
         onOpenDispatchMission={() => setIsDispatchMissionOpen(true)}
         onOpenCreateTask={() => setIsCreateTaskOpen(true)}
         onOpenTaskBoard={() => setIsTaskBoardOpen(true)}
+        onOpenWorkspaceFiles={() => setIsWorkspaceFilesOpen(true)}
         onOpenMissionDashboard={() => setIsMissionDashboardOpen(true)}
         onOpenInbox={() => setIsInboxOpen(true)}
         onOpenOpportunityHQ={() => setIsOpportunityHQOpen(true)}
@@ -275,6 +278,11 @@ export default function App() {
           setIsCreateTaskOpen(true);
         }}
         onSelectAgentById={handleSelectAgentById}
+      />
+
+      <WorkspaceFilesModal
+        isOpen={isWorkspaceFilesOpen}
+        onClose={() => setIsWorkspaceFilesOpen(false)}
       />
 
       <CreateTaskModal

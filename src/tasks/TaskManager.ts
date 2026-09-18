@@ -54,23 +54,27 @@ class TaskManagerClass {
       if (serverTasks && Array.isArray(serverTasks) && serverTasks.length > 0) {
         serverTasks.forEach((st: any) => {
           const existing = this.tasks.get(st.id);
-          const mapped: TaskModel = {
-            id: st.id,
-            title: st.title,
-            description: st.description || '',
-            status: st.status === 'COMPLETED' ? 'COMPLETED' : st.status === 'RUNNING' ? 'IN_PROGRESS' : 'QUEUED',
-            priority: st.priority || 'MEDIUM',
-            assignedAgentId: st.assigned_agent_id || null,
-            progress: st.status === 'COMPLETED' ? 100 : existing?.progress || 0,
-            createdAt: st.created_at || Date.now(),
-            startedAt: st.started_at,
-            completedAt: st.completed_at,
-            dependencies: st.dependencies || existing?.dependencies || [],
-            logs: existing?.logs || [],
-            result: st.result,
-            executionMode: st.execution_mode || 'mock',
-          };
-          this.tasks.set(st.id, mapped);
+            let parsedResult = st.result;
+            if (typeof parsedResult === 'string') {
+              try { parsedResult = JSON.parse(parsedResult); } catch {}
+            }
+            const mapped: TaskModel = {
+              id: st.id,
+              title: st.title,
+              description: st.description || '',
+              status: st.status === 'COMPLETED' ? 'COMPLETED' : st.status === 'RUNNING' ? 'IN_PROGRESS' : 'QUEUED',
+              priority: st.priority || 'MEDIUM',
+              assignedAgentId: st.assigned_agent_id || null,
+              progress: st.status === 'COMPLETED' ? 100 : existing?.progress || 0,
+              createdAt: st.created_at || Date.now(),
+              startedAt: st.started_at,
+              completedAt: st.completed_at,
+              dependencies: st.dependencies || existing?.dependencies || [],
+              logs: existing?.logs || [],
+              result: parsedResult || existing?.result,
+              executionMode: st.execution_mode || (parsedResult as any)?.executionMode || 'mock',
+            };
+            this.tasks.set(st.id, mapped);
         });
       }
     } catch {
@@ -85,6 +89,7 @@ class TaskManagerClass {
       if (task) {
         task.status = 'IN_PROGRESS';
         if (!task.startedAt) task.startedAt = e.timestamp;
+        this.addLog(task.id, task.assignedAgentId || 'system', 'Execution started in background', 'status');
         this.save();
         this.apiClient.updateTaskStatus(task.id, 'RUNNING');
       }
@@ -106,9 +111,17 @@ class TaskManagerClass {
         task.status = 'COMPLETED';
         task.progress = 100;
         task.completedAt = e.timestamp;
-        if (e.result) task.result = e.result;
+        let res = e.result;
+        if (typeof res === 'string') {
+          try { res = JSON.parse(res); } catch {}
+        }
+        if (res) {
+          task.result = res;
+          if (res.executionMode) task.executionMode = res.executionMode;
+        }
+        this.addLog(task.id, task.assignedAgentId || 'system', `Task completed: ${res?.summary || 'Deliverables generated successfully'}`, 'status');
         this.save();
-        this.apiClient.updateTaskStatus(task.id, 'COMPLETED', e.result, (e as any).executionMode || 'mock');
+        this.apiClient.updateTaskStatus(task.id, 'COMPLETED', task.result, (e as any).executionMode || task.executionMode || 'mock');
       }
     });
 
@@ -117,6 +130,7 @@ class TaskManagerClass {
       const task = this.tasks.get(e.taskId);
       if (task) {
         task.status = 'BLOCKED';
+        this.addLog(task.id, task.assignedAgentId || 'system', `Task failed: ${e.error || 'Execution blocked'}`, 'status');
         this.save();
         this.apiClient.updateTaskStatus(task.id, 'FAILED');
       }
@@ -295,13 +309,24 @@ class TaskManagerClass {
     const task = this.tasks.get(taskId);
     if (!task) return;
     task.status = status;
+    let parsedResult = result;
+    if (typeof parsedResult === 'string') {
+      try { parsedResult = JSON.parse(parsedResult); } catch {}
+    }
+
     if (status === 'IN_PROGRESS') {
       if (!task.startedAt) task.startedAt = Date.now();
       task.progress = Math.max(task.progress, 20);
+      this.addLog(taskId, task.assignedAgentId || 'system', 'Execution started in background', 'status');
     } else if (status === 'COMPLETED') {
       task.completedAt = Date.now();
       task.progress = 100;
-      if (result) task.result = result;
+      if (parsedResult) {
+        task.result = parsedResult;
+        if (parsedResult.executionMode) task.executionMode = parsedResult.executionMode;
+      }
+      const summaryText = parsedResult?.summary || 'Deliverables generated successfully';
+      this.addLog(taskId, task.assignedAgentId || 'system', `Task completed: ${summaryText}`, 'status');
     }
     this.save();
     EventBus.emit({
@@ -310,7 +335,7 @@ class TaskManagerClass {
       taskId,
       timestamp: Date.now(),
       status,
-      result,
+      result: task.result,
     } as any);
   }
 

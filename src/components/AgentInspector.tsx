@@ -88,6 +88,8 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
   const recentMessages = MessageBus.getMessagesForAgent(agent.id).slice(0, 15);
   const directConversation = MessageBus.getUserConversation(agent.id);
   const allAgents = AgentManager.getAll();
+  const agentTasks = TaskManager.getByAgentId(agent.id);
+  const completedTasks = agentTasks.filter((t) => t.status === 'COMPLETED');
 
   const handleFocus = () => {
     camera.focusOnPosition(agent.currentPosition, 1.4);
@@ -621,7 +623,78 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
               </div>
             </div>
 
-            {/* Finished Work */}
+            {/* Completed Tasks & Deliverables */}
+            <div className="space-y-2 pt-1">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                  Completed Tasks & Deliverables
+                </span>
+                <span className="text-[10px] font-mono text-emerald-400 font-semibold">
+                  ({completedTasks.length})
+                </span>
+              </h4>
+
+              {completedTasks.length === 0 ? (
+                <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-800/80 text-xs text-slate-500 text-center py-4">
+                  No completed tasks yet. Assign a task or initiate one from Direct Chat.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {completedTasks.map((t) => {
+                    let res = t.result;
+                    if (typeof res === 'string') {
+                      try {
+                        res = JSON.parse(res);
+                      } catch {}
+                    }
+                    const summary = res?.summary || 'Task completed successfully.';
+                    const output = res?.output || '';
+                    const duration = res?.durationMs ? `${(res.durationMs / 1000).toFixed(1)}s` : '';
+
+                    return (
+                      <div
+                        key={t.id}
+                        className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 text-xs"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-200 text-xs leading-tight">
+                            {t.title}
+                          </span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase font-bold">
+                            COMPLETED
+                          </span>
+                        </div>
+
+                        {/* Summary Deliverable */}
+                        <p className="text-[11px] text-slate-300 bg-slate-950/60 p-2 rounded-lg border border-slate-800/60 leading-relaxed">
+                          {summary}
+                        </p>
+
+                        {/* Technical Output if present */}
+                        {output && (
+                          <div className="space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                              Technical Deliverable Output:
+                            </span>
+                            <pre className="text-[10px] font-mono text-slate-300 bg-slate-950 p-2.5 rounded-lg border border-slate-800/80 whitespace-pre-wrap max-h-36 overflow-y-auto leading-relaxed select-text">
+                              {output}
+                            </pre>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono pt-1">
+                          <span>{t.completedAt ? new Date(t.completedAt).toLocaleTimeString() : ''}</span>
+                          {duration && <span>Duration: {duration}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Finished Artifacts */}
             {agentArtifacts.length > 0 && (
               <div className="space-y-2">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">

@@ -13,6 +13,7 @@ import Database from 'better-sqlite3';
 import { DiscoveryService } from '../../src/opportunity/DiscoveryService.ts';
 import { ArbeitnowOpportunityAdapter } from '../../src/opportunity/adapters/ArbeitnowOpportunityAdapter.ts';
 import { OpportunityManager } from '../../src/opportunity/OpportunityManager.ts';
+import { WorkspaceFileManager } from '../services/WorkspaceFileManager.ts';
 
 export interface ProviderCascadeOptions {
   geminiClients?: { client: GoogleGenAI; key: string }[];
@@ -730,16 +731,36 @@ Execute the following initiative task:
 Task: ${title}
 Requirements: ${fullRequirements}
 
-Produce a structured JSON response with:
+WORKSPACE REAL-FILE GENERATION INSTRUCTIONS:
+You have the authority to create, write, or edit real files in the user's workspace!
+Whenever the task involves:
+- Writing or editing documents, case studies, reports, articles, or guides (e.g. .md, .docx, .txt)
+- Researching and creating spreadsheets, datasets, or tables (e.g. .xlsx, .csv)
+- Writing novel chapters, stories, episodes, or creative prose (e.g. .md, .docx)
+- Writing or refactoring source code, scripts, configs (e.g. .ts, .js, .py, .json)
+You MUST generate the complete, high-quality, comprehensive file content and include it in the "files" array in your JSON output.
+Do NOT use placeholders or omit sections. Produce the full text/code/data.
+For .docx files: provide rich Markdown text with headings (#, ##), bullet points, and bold text. The system automatically compiles it into a native Microsoft Word .docx document.
+For .xlsx files: provide clean CSV text or a JSON array of row objects. The system automatically compiles it into a native Microsoft Excel .xlsx workbook.
+
+Produce a structured JSON response matching this schema:
 {
   "summary": "Concise summary of execution deliverables",
-  "output": "Technical output and findings",
-  "toolsUsed": ["tool_name"]
+  "output": "Technical output, findings, or document preview",
+  "toolsUsed": ["tool_name"],
+  "files": [
+    {
+      "path": "filename.ext",
+      "content": "Full complete file content here",
+      "format": "text" | "docx" | "xlsx" | "csv",
+      "action": "create" | "overwrite" | "append"
+    }
+  ]
 }`;
 
         const cascadeRes = await callAIWithCascade(prompt, providerId);
         const text = cascadeRes.text || '';
-        let parsed: { summary?: string; output?: string; toolsUsed?: string[] } = {};
+        let parsed: { summary?: string; output?: string; toolsUsed?: string[]; files?: Array<{ path: string; content: string; format?: any; action?: any }> } = {};
         try {
           const jsonMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
           const toParse = jsonMatch ? jsonMatch[1].trim() : text.trim();
@@ -757,11 +778,38 @@ Produce a structured JSON response with:
           }
         }
 
+        // Process any workspace files the agent produced
+        const filesCreated: Array<{ filename: string; relativePath: string; sizeBytes: number; extension: string; downloadUrl: string }> = [];
+        if (Array.isArray(parsed.files) && parsed.files.length > 0) {
+          for (const f of parsed.files) {
+            if (f && f.path && typeof f.content === 'string') {
+              try {
+                const written = await WorkspaceFileManager.writeFile({
+                  relativePath: f.path,
+                  content: f.content,
+                  format: f.format,
+                  action: f.action || 'create',
+                });
+                filesCreated.push({
+                  filename: written.filename,
+                  relativePath: written.relativePath,
+                  sizeBytes: written.sizeBytes,
+                  extension: written.extension,
+                  downloadUrl: `/api/workspace/files/${encodeURIComponent(written.relativePath)}?download=true`,
+                });
+              } catch (fileErr) {
+                console.warn(`[Workspace] Failed to write file ${f.path}:`, fileErr);
+              }
+            }
+          }
+        }
+
         const durationMs = cascadeRes.durationMs || 1200;
         const result = {
           summary: parsed.summary || `${agentName} synthesized task results`,
           output: parsed.output || text,
           toolsUsed: parsed.toolsUsed || cascadeRes.toolsUsed,
+          filesCreated,
         };
 
         const executionMode = cascadeRes.provider === 'mock' ? 'mock' : 'real';
@@ -802,12 +850,54 @@ Produce a structured JSON response with:
       }
     }
 
-    // Local / Mock Provider Execution
+    // Local / Mock Provider Execution with real workspace file generation fallback
     const durationMs = 650;
+    const filesCreated: Array<{ filename: string; relativePath: string; sizeBytes: number; extension: string; downloadUrl: string }> = [];
+
+    // If the prompt is asking to generate or edit a file, create it in workspace even in mock mode
+    const lowerTitle = `${title} ${description || ''}`.toLowerCase();
+    if (lowerTitle.includes('case study') || lowerTitle.includes('doc') || lowerTitle.includes('novel') || lowerTitle.includes('excel') || lowerTitle.includes('sheet') || lowerTitle.includes('code')) {
+      try {
+        let filename = 'deliverable.md';
+        let content = `# Deliverable: ${title}\n\nGenerated by ${agentName} (${role}).\n\n${description || ''}\n`;
+        let format: any = 'text';
+
+        if (lowerTitle.includes('case study')) {
+          filename = 'agent-hq-case-study.md';
+          content = `# Agent HQ — Comprehensive Engineering Case Study\n\n## 1. Executive Summary\nAgent HQ is an autonomous multi-agent orchestration platform designed for real-world enterprise operations.\n\n## 2. Architecture\n- **DAG Scheduler**: Dynamic dependency resolution.\n- **4-Tier Memory**: Working, Task, Persistent, Semantic.\n- **Reactive EventBus**: Live telemetry & state streaming.\n- **Workspace File Engine**: Native creation of Markdown, DOCX, and XLSX.\n\n## 3. Validated Capabilities\n- Deterministic skill matching without hallucinations.\n- Resilient multi-tier LLM cascade with automatic failover.\n- Strict human-in-the-loop approval boundaries.\n`;
+        } else if (lowerTitle.includes('novel') || lowerTitle.includes('episode') || lowerTitle.includes('chapter')) {
+          filename = 'novel-chapter.md';
+          content = `# Chapter 1: The First Directive\n\nThe silence inside the orbital terminal was broken only by the rhythmic hum of the reactor core...\n`;
+        } else if (lowerTitle.includes('excel') || lowerTitle.includes('sheet') || lowerTitle.includes('xlsx')) {
+          filename = 'data-analysis.xlsx';
+          content = 'Category,Item,Status,Score\nArchitecture,DAG Engine,Verified,98\nSecurity,Human Approval Gates,Active,100\nPersistence,WAL SQLite,Operational,96';
+          format = 'xlsx';
+        }
+
+        const written = await WorkspaceFileManager.writeFile({
+          relativePath: filename,
+          content,
+          format,
+          action: 'create',
+        });
+
+        filesCreated.push({
+          filename: written.filename,
+          relativePath: written.relativePath,
+          sizeBytes: written.sizeBytes,
+          extension: written.extension,
+          downloadUrl: `/api/workspace/files/${encodeURIComponent(written.relativePath)}?download=true`,
+        });
+      } catch (err) {
+        console.warn('[Mock Workspace] Error generating mock workspace file:', err);
+      }
+    }
+
     const result = {
       summary: `Completed "${title}" via deterministic simulation engine.`,
       output: `Task ${taskId} verified with zero defects across bounds.`,
       toolsUsed: ['mock_simulation_engine'],
+      filesCreated,
     };
 
     repos.tasks.recordResult(taskId, result, 'mock');
@@ -1363,6 +1453,58 @@ ${agentName}:`;
     });
 
     res.status(201).json(created);
+  });
+
+  // ----------------------------------------------------
+  // 12B. Real Workspace Files Endpoints
+  // ----------------------------------------------------
+
+  router.get('/workspace/files', (_req: Request, res: Response) => {
+    try {
+      const files = WorkspaceFileManager.listFiles();
+      res.json({ files });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/workspace/files/:filename(*)', (req: Request, res: Response) => {
+    try {
+      const filepath = req.params.filename;
+      const download = req.query.download === 'true';
+      const fileData = WorkspaceFileManager.readFile(filepath);
+      const fullPath = WorkspaceFileManager.resolveSafePath(filepath);
+
+      if (download) {
+        return res.download(fullPath, fileData.meta.filename);
+      }
+
+      res.setHeader('Content-Type', fileData.meta.mimeType);
+      if (fileData.meta.isBinary && fileData.buffer) {
+        return res.send(fileData.buffer);
+      }
+      res.send(fileData.content);
+    } catch (err: any) {
+      res.status(404).json({ error: err.message });
+    }
+  });
+
+  router.post('/workspace/files', authService.optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { path: relPath, content, format, action } = req.body;
+      if (!relPath || typeof content !== 'string') {
+        return res.status(400).json({ error: 'Missing required parameters: path, content' });
+      }
+      const meta = await WorkspaceFileManager.writeFile({
+        relativePath: relPath,
+        content,
+        format,
+        action: action || 'create',
+      });
+      res.json({ success: true, file: meta });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // ----------------------------------------------------

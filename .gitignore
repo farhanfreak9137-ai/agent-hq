@@ -19,4 +19,5 @@ runtime_execution_*.png
 task_board_*.png
 browser_master_*.png
 !assets/screenshots/*.png
+on/
 

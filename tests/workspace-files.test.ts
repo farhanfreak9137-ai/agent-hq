@@ -54,6 +54,37 @@ async function testWorkspaceAndDecomposition() {
   console.log(` - ${caseStudyMd.filename} (${caseStudyMd.sizeBytes} bytes)`);
   console.log(` - ${caseStudyDocx.filename} (${caseStudyDocx.sizeBytes} bytes)`);
 
+  // Test 5: Remote Job Matches Deliverables
+  console.log('\n--- Test 5: Remote Job Matches Excel & Markdown Deliverables ---');
+  const jobXlsx = files.find((f) => f.filename === 'remote-job-matches.xlsx');
+  const jobMd = files.find((f) => f.filename === 'remote-job-matches.md');
+
+  if (!jobXlsx || jobXlsx.sizeBytes === 0) {
+    throw new Error('Missing or empty remote-job-matches.xlsx in workspace!');
+  }
+  if (!jobMd || jobMd.sizeBytes === 0) {
+    throw new Error('Missing or empty remote-job-matches.md in workspace!');
+  }
+  console.log(`[PASS] Remote Job Deliverables verified in workspace/:`);
+  console.log(` - ${jobXlsx.filename} (${jobXlsx.sizeBytes} bytes)`);
+  console.log(` - ${jobMd.filename} (${jobMd.sizeBytes} bytes)`);
+
+  // Test 6: Database Agent Registry Completeness
+  console.log('\n--- Test 6: SQLite Database Agent Registry Completeness ---');
+  const { getDatabase } = await import('../server/db/database.ts');
+  const { seedDatabase } = await import('../server/db/migrations.ts');
+  const db = getDatabase();
+  seedDatabase(db);
+  const registeredAgents = db.prepare('SELECT id FROM agents').all() as Array<{ id: string }>;
+  const registeredIds = registeredAgents.map((a) => a.id);
+  const requiredAgents = ['boss', 'nova', 'atlas', 'pixel', 'echo', 'sentinel', 'vector', 'quill', 'strategist', 'crm', 'outreach'];
+  for (const req of requiredAgents) {
+    if (!registeredIds.includes(req)) {
+      throw new Error(`Agent ${req} is missing from SQLite database agents table!`);
+    }
+  }
+  console.log(`[PASS] All 11 agents confirmed in SQLite: ${registeredIds.join(', ')}`);
+
   console.log('\n====================================================');
   console.log('ALL WORKSPACE & DECOMPOSITION TESTS PASSED 100%!');
   console.log('====================================================\n');

@@ -14,6 +14,9 @@ import { DiscoveryService } from '../../src/opportunity/DiscoveryService.ts';
 import { ArbeitnowOpportunityAdapter } from '../../src/opportunity/adapters/ArbeitnowOpportunityAdapter.ts';
 import { OpportunityManager } from '../../src/opportunity/OpportunityManager.ts';
 import { WorkspaceFileManager } from '../services/WorkspaceFileManager.ts';
+import { EmailService } from '../services/EmailService.ts';
+import { NotificationService } from '../services/NotificationService.ts';
+import { ReplyListenerService } from '../services/ReplyListenerService.ts';
 
 export interface ProviderCascadeOptions {
   geminiClients?: { client: GoogleGenAI; key: string }[];
@@ -721,7 +724,32 @@ export function createApiRouter(
     }
 
     const fileContext = resolveFileContext(`${title} ${description || ''}`);
-    const fullRequirements = `${description || ''}${fileContext}`;
+    const taskLower = `${title} ${description || ''}`.toLowerCase();
+    let profileContext = '';
+    const profile = repos.profile.get('FULL');
+    if (
+      profile &&
+      (taskLower.includes('job') ||
+        taskLower.includes('remote') ||
+        taskLower.includes('career') ||
+        taskLower.includes('resume') ||
+        taskLower.includes('farhan') ||
+        taskLower.includes('profile') ||
+        taskLower.includes('application') ||
+        taskLower.includes('outreach'))
+    ) {
+      profileContext = `\n\nFARHAN'S CANDIDATE PROFILE & PREFERENCES (ON RECORD):
+- Candidate: ${profile.identity.fullName} (${profile.identity.professionalHeadline})
+- Location & Timezone: ${profile.identity.location || 'Dhaka'} | ${profile.identity.timezone || 'UTC+6'}
+- Contact: ${profile.identity.email} | LinkedIn: ${profile.identity.linkedInUrl || (profile.identity as any).linkedinUrl || 'https://linkedin.com/in/farhanfreak9137'}
+- Target Roles: ${(profile.preferences?.targetRoles || []).join(', ')}
+- Min Pay: ${profile.preferences?.minSalary || '$45,000 - $75,000 / year'}
+- Timezone Requirements: ${profile.preferences?.timezoneRequirements || 'Flexible with US/EU timezone overlap'}
+- Deal-Breakers: ${(profile.preferences?.dealBreakers || []).join('; ')}
+- Submission Strategy: ${profile.preferences?.submissionStrategy || 'human_in_the_loop'}
+- Core Skills: ${(profile.skills?.verifiedSkills || []).slice(0, 15).join(', ')}`;
+    }
+    const fullRequirements = `${description || ''}${fileContext}${profileContext}`;
 
     // If not mock, run through the resilient multi-tier provider cascade
     if (providerId !== 'mock') {
@@ -802,6 +830,100 @@ Produce a structured JSON response matching this schema:
               }
             }
           }
+        }
+
+        // Auto-Extractor Fallback: If no files were explicitly returned in `parsed.files`,
+        // automatically extract deliverables from markdown tables, document text, and mentioned filenames
+        const outputText = parsed.output || text || '';
+        const combinedText = `${title} ${description || ''} ${outputText}`;
+
+        const tryWriteAutoDeliverable = async (
+          relPath: string,
+          content: string,
+          format?: 'text' | 'docx' | 'xlsx' | 'csv'
+        ) => {
+          if (!relPath || !content || !content.trim()) return;
+          if (filesCreated.some((fc) => fc.relativePath.toLowerCase() === relPath.toLowerCase())) return;
+          try {
+            const written = await WorkspaceFileManager.writeFile({
+              relativePath: relPath,
+              content,
+              format,
+              action: 'overwrite',
+            });
+            filesCreated.push({
+              filename: written.filename,
+              relativePath: written.relativePath,
+              sizeBytes: written.sizeBytes,
+              extension: written.extension,
+              downloadUrl: `/api/workspace/files/${encodeURIComponent(written.relativePath)}?download=true`,
+            });
+          } catch (err) {
+            console.warn(`[Workspace Auto-Extractor] Failed to write ${relPath}:`, err);
+          }
+        };
+
+        // 1. Scan for explicit file mentions in output text or instructions (e.g. `workspace/something.ext` or `filename.xlsx`)
+        const fileRegex = /(?:workspace\/|`workspace\/)?([a-zA-Z0-9_\-]+\.(?:xlsx|docx|md|csv|json|txt))(?:\s|`|\)|$)/gi;
+        const matches = Array.from(combinedText.matchAll(fileRegex));
+        const matchedFilenames = matches.map((m) => m[1].toLowerCase());
+
+        // 2. Check for Markdown tables -> Excel (.xlsx) / CSV
+        const hasMarkdownTable = /\|(?:[^\r\n|]+\|)+\r?\n\|(?:\s*:?-+:?\s*\|)+\r?\n(?:\|(?:[^\r\n|]+\|)+\r?\n?)+/i.test(outputText);
+        const wantsExcel =
+          matchedFilenames.some((name) => name.endsWith('.xlsx') || name.endsWith('.csv')) ||
+          /(?:\.xlsx|\.csv|excel|spreadsheet|dataset|sheet)/i.test(`${title} ${description || ''}`);
+
+        if (hasMarkdownTable && wantsExcel) {
+          let xlsxName =
+            matchedFilenames.find((f) => f.endsWith('.xlsx')) ||
+            matchedFilenames.find((f) => f.endsWith('.csv'));
+          if (!xlsxName) {
+            const slug =
+              title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '')
+                .substring(0, 40) || 'data';
+            xlsxName = `${slug}.xlsx`;
+          }
+          await tryWriteAutoDeliverable(xlsxName, outputText, 'xlsx');
+        }
+
+        // 3. Check for Word Document (.docx)
+        const wantsDocx =
+          matchedFilenames.some((f) => f.endsWith('.docx')) ||
+          /(?:\.docx|word document|case study|formal report)/i.test(`${title} ${description || ''}`);
+        if (wantsDocx && outputText.length > 50) {
+          let docxName = matchedFilenames.find((f) => f.endsWith('.docx'));
+          if (!docxName) {
+            const slug =
+              title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '')
+                .substring(0, 40) || 'document';
+            docxName = `${slug}.docx`;
+          }
+          await tryWriteAutoDeliverable(docxName, outputText, 'docx');
+        }
+
+        // 4. Check for Markdown document (.md)
+        const wantsMd =
+          matchedFilenames.some((f) => f.endsWith('.md')) ||
+          /(?:\.md|markdown|report|summary|guide|novel|chapter|episode)/i.test(`${title} ${description || ''}`);
+        if (wantsMd && outputText.length > 50) {
+          let mdName = matchedFilenames.find((f) => f.endsWith('.md'));
+          if (!mdName) {
+            const slug =
+              title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '')
+                .substring(0, 40) || 'report';
+            mdName = `${slug}.md`;
+          }
+          await tryWriteAutoDeliverable(mdName, outputText, 'text');
         }
 
         const durationMs = cascadeRes.durationMs || 1200;
@@ -1146,6 +1268,28 @@ Produce a structured JSON response matching this schema:
         history.slice(-8).map((h: any) => `${h.role === 'user' ? 'Farhan' : agentName}: ${h.content}`).join('\n');
     }
 
+    // Load Farhan's authoritative profile & preferences so agents already know his resume & filters
+    const profile = repos.profile.get('FULL');
+    let profileContext = '';
+    if (profile) {
+      profileContext = `
+FARHAN'S CONFIGURED MASTER PROFILE & JOB PREFERENCES (ALREADY ON RECORD - DO NOT ASK FOR THESE):
+- Full Name: ${profile.identity.fullName} (${profile.identity.professionalHeadline})
+- Location: ${profile.identity.location || 'Dhaka, Bangladesh'}
+- Timezone: ${profile.identity.timezone || 'UTC+6 (Dhaka)'}
+- Email: ${profile.identity.email} | Phone: ${profile.identity.phone || 'Available'}
+- LinkedIn: ${profile.identity.linkedInUrl || (profile.identity as any).linkedinUrl || 'https://www.linkedin.com/in/farhanfreak9137'}
+- Portfolio: ${profile.identity.portfolioUrl} | GitHub: ${profile.identity.githubUrl}
+- Target Job Roles: ${(profile.preferences?.targetRoles || ['Full Stack Engineer', 'AI Engineer', 'Frontend Developer', 'AI Integrations Specialist', 'Node.js Developer']).join(', ')}
+- Min Pay / Compensation: ${profile.preferences?.minSalary || '$45,000 - $75,000 / year (or $30 - $50 / hour)'}
+- Timezone Working Hours: ${profile.preferences?.timezoneRequirements || 'Flexible — Can overlap 4+ hours daily with US Eastern/Pacific and European timezones'}
+- Deal-Breakers: ${(profile.preferences?.dealBreakers || ['100% remote only (No relocation)', 'No uncompensated take-home test projects', 'No unpaid work']).join('; ')}
+- Application Execution Strategy: ${profile.preferences?.submissionStrategy === 'autonomous' ? 'Option B: Autonomous Submission' : 'Option A: Human-in-the-loop (Draft, score, & review before submit)'}
+- Key Verified Skills: ${(profile.skills?.verifiedSkills || []).slice(0, 15).join(', ')}
+${profile.documents?.masterResumeMarkdown ? `- Master Resume: Fully configured on record (${profile.documents.masterResumeMarkdown.length} chars).` : ''}
+`;
+    }
+
     const prompt = `You are ${agentName}, an autonomous AI specialist at Agent HQ with the role of "${role}".
 Your system directive: ${directive}
 Your capabilities: ${JSON.stringify(capabilities)}.
@@ -1163,7 +1307,10 @@ CRITICAL GUIDELINES:
   "priority": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
 }
 \`\`\`
+5. FARHAN'S PROFILE, MASTER RESUME, LINKEDIN, TARGET ROLES, AND APPLICATION PREFERENCES ARE ALREADY CONFIGURED (see below). NEVER ask Farhan to provide his resume, LinkedIn link, contact details, target roles, filters, pay requirements, or strategy again—you already have them on record in your active memory! Act upon them directly and proactively.
+6. DIRECT GMAIL & OUTREACH ENGINE: You have direct integration with Farhan's Gmail and an Outreach Engine. When Farhan asks to reach out to companies, email recruiters/jobs from a spreadsheet, or apply via email, confirm that you will draft customized emails into the Outreach Outbox with Farhan's tailored cover pitch and resume attached, where he can review and dispatch them with anti-spam rate limiting.
 If this is regular discussion or planning without a concrete task to launch right now, DO NOT include the proposal block. Keep your response concise, sharp, and helpful.
+${profileContext}
 ${conversationContext}
 
 Farhan: "${userMessage}"
@@ -2076,6 +2223,285 @@ ${agentName}:`;
     res.json({ success: true, message: 'Application submitted successfully.', application: app });
   });
 
+  // ----------------------------------------------------
+  // 19. Gmail Integration & Outreach Outbox Endpoints
+  // ----------------------------------------------------
+
+  router.get('/email/config', (_req: Request, res: Response) => {
+    try {
+      const config = EmailService.getConfig(db);
+      res.json({
+        ...config,
+        app_password: config.app_password ? '••••••••••••••••' : '',
+        has_password: Boolean(config.app_password),
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/email/config', (req: Request, res: Response) => {
+    try {
+      const { gmail_address, app_password, sender_name, stagger_delay_seconds, auto_send_enabled } = req.body;
+      const updates: any = {};
+      if (gmail_address !== undefined) updates.gmail_address = gmail_address;
+      if (app_password !== undefined && app_password !== '••••••••••••••••' && app_password.trim() !== '') {
+        updates.app_password = app_password;
+      }
+      if (sender_name !== undefined) updates.sender_name = sender_name;
+      if (stagger_delay_seconds !== undefined) updates.stagger_delay_seconds = Number(stagger_delay_seconds);
+      if (auto_send_enabled !== undefined) updates.auto_send_enabled = auto_send_enabled ? 1 : 0;
+
+      const saved = EmailService.updateConfig(db, updates);
+      res.json({
+        success: true,
+        config: {
+          ...saved,
+          app_password: saved.app_password ? '••••••••••••••••' : '',
+          has_password: Boolean(saved.app_password),
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/email/test', async (_req: Request, res: Response) => {
+    try {
+      const result = await EmailService.testConnection(db);
+      res.json(result);
+    } catch (err: any) {
+      res.json({ success: false, message: err?.message || String(err) });
+    }
+  });
+
+  router.get('/outreach/emails', (_req: Request, res: Response) => {
+    try {
+      const rows = db.prepare('SELECT * FROM outreach_emails ORDER BY created_at DESC').all();
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/outreach/draft-from-sheet', async (req: Request, res: Response) => {
+    try {
+      const { jobs } = req.body;
+      const drafted = await EmailService.draftFromJobs(db, jobs);
+      eventStream.broadcast({
+        id: `ev_draft_${Date.now()}`,
+        type: 'agent.message_sent',
+        timestamp: Date.now(),
+        message: `Outreach Agent generated ${drafted.length} tailored application emails in Outbox.`,
+        agent_id: 'outreach',
+        task_id: null,
+        mission_id: null,
+        metadata: { count: drafted.length },
+      });
+      res.json({ success: true, drafted, count: drafted.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/outreach/send', async (req: Request, res: Response) => {
+    try {
+      const { emailIds, delaySeconds } = req.body;
+      const result = await EmailService.sendBatchStaggered(db, emailIds, delaySeconds);
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/outreach/emails/:id/send', async (req: Request, res: Response) => {
+    try {
+      const result = await EmailService.sendOutreachEmail(db, req.params.id);
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.put('/outreach/emails/:id', (req: Request, res: Response) => {
+    try {
+      const { subject, body_text, body_html, recipient_email, company, role } = req.body;
+      const existing = db.prepare('SELECT * FROM outreach_emails WHERE id = ?').get(req.params.id) as any;
+      if (!existing) return res.status(404).json({ error: 'Email not found' });
+
+      db.prepare(`
+        UPDATE outreach_emails
+        SET subject = ?, body_text = ?, body_html = ?, recipient_email = ?, company = ?, role = ?
+        WHERE id = ?
+      `).run(
+        subject ?? existing.subject,
+        body_text ?? existing.body_text,
+        body_html ?? existing.body_html,
+        recipient_email ?? existing.recipient_email,
+        company ?? existing.company,
+        role ?? existing.role,
+        req.params.id
+      );
+
+      const updated = db.prepare('SELECT * FROM outreach_emails WHERE id = ?').get(req.params.id);
+      res.json({ success: true, email: updated });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.delete('/outreach/emails/:id', (req: Request, res: Response) => {
+    try {
+      db.prepare('DELETE FROM outreach_emails WHERE id = ?').run(req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ----------------------------------------------------
+  // 20. Incoming Replies & Phone Notification Endpoints
+  // ----------------------------------------------------
+
+  router.get('/replies', (_req: Request, res: Response) => {
+    try {
+      const rows = db.prepare('SELECT * FROM incoming_replies ORDER BY received_at DESC').all();
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/replies/poll', async (_req: Request, res: Response) => {
+    try {
+      const result = await ReplyListenerService.pollInbox(db);
+      if (result.newReplies > 0) {
+        eventStream.broadcast({
+          id: `ev_reply_${Date.now()}`,
+          type: 'agent.message_sent',
+          timestamp: Date.now(),
+          message: `CRM Agent: Detected ${result.newReplies} new incoming recruiter reply(s)!`,
+          agent_id: 'crm',
+          task_id: null,
+          mission_id: null,
+          metadata: { newReplies: result.newReplies },
+        });
+      }
+      res.json(result);
+    } catch (err: any) {
+      res.json({ checked: false, newReplies: 0, replies: [], error: err?.message || String(err) });
+    }
+  });
+
+  router.post('/replies/:id/send', async (req: Request, res: Response) => {
+    try {
+      const reply = db.prepare('SELECT * FROM incoming_replies WHERE id = ?').get(req.params.id) as any;
+      if (!reply) return res.status(404).json({ error: 'Reply record not found' });
+      if (!reply.drafted_reply) return res.status(400).json({ error: 'No drafted reply found to send' });
+
+      const config = EmailService.getConfig(db);
+      const transporter = EmailService.createTransport(config);
+
+      const subject = reply.subject.startsWith('Re:') ? reply.subject : `Re: ${reply.subject}`;
+      await transporter.sendMail({
+        from: `"${config.sender_name}" <${config.gmail_address}>`,
+        to: reply.from_email,
+        subject,
+        text: reply.drafted_reply,
+      });
+
+      db.prepare("UPDATE incoming_replies SET status = 'replied' WHERE id = ?").run(req.params.id);
+
+      eventStream.broadcast({
+        id: `ev_replied_${Date.now()}`,
+        type: 'agent.message_sent',
+        timestamp: Date.now(),
+        message: `Outreach Agent dispatched follow-up response to ${reply.company} (${reply.from_email})`,
+        agent_id: 'outreach',
+        task_id: null,
+        mission_id: null,
+        metadata: { replyId: req.params.id, company: reply.company },
+      });
+
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.put('/replies/:id', (req: Request, res: Response) => {
+    try {
+      const { drafted_reply, status } = req.body;
+      const existing = db.prepare('SELECT * FROM incoming_replies WHERE id = ?').get(req.params.id) as any;
+      if (!existing) return res.status(404).json({ error: 'Reply not found' });
+
+      db.prepare(`
+        UPDATE incoming_replies
+        SET drafted_reply = ?, status = ?
+        WHERE id = ?
+      `).run(
+        drafted_reply ?? existing.drafted_reply,
+        status ?? existing.status,
+        req.params.id
+      );
+
+      const updated = db.prepare('SELECT * FROM incoming_replies WHERE id = ?').get(req.params.id);
+      res.json({ success: true, reply: updated });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.delete('/replies/:id', (req: Request, res: Response) => {
+    try {
+      db.prepare('DELETE FROM incoming_replies WHERE id = ?').run(req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/notifications/config', (_req: Request, res: Response) => {
+    try {
+      const config = NotificationService.getConfig(db);
+      res.json(config);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/notifications/config', (req: Request, res: Response) => {
+    try {
+      const { channel, discord_webhook_url, is_enabled, poll_interval_minutes } = req.body;
+      const saved = NotificationService.updateConfig(db, {
+        channel,
+        discord_webhook_url,
+        is_enabled,
+        poll_interval_minutes,
+      });
+      res.json({ success: true, config: saved });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/notifications/test', async (_req: Request, res: Response) => {
+    try {
+      const result = await NotificationService.testAlert(db);
+      res.json(result);
+    } catch (err: any) {
+      res.json({ success: false, message: err?.message || String(err) });
+    }
+  });
+
+  // Start background inbox polling
+  ReplyListenerService.startBackgroundListener(db, 5);
+
   return router;
 }
+
+
 

@@ -43,6 +43,7 @@ export interface TaskExecutionResult {
   executionMode?: 'real' | 'mock';
   confidence?: number;
   artifacts?: Artifact[];
+  filesCreated?: Array<{ filename: string; relativePath: string; sizeBytes: number; extension: string; downloadUrl: string }>;
 }
 
 export interface MessageResponse {

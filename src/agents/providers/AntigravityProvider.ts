@@ -125,6 +125,7 @@ export class AntigravityAgentRuntime implements AgentRuntime {
         durationMs,
         toolsUsed: result.toolsUsed || ['antigravity_reasoning'],
         executionMode,
+        filesCreated: result.filesCreated,
       };
 
       Logger.taskCompleted(task.id, this.agentId, task.title, 'antigravity', executionMode, durationMs);

@@ -94,6 +94,7 @@ export class GeminiAgentRuntime implements AgentRuntime {
         durationMs,
         toolsUsed: result.toolsUsed || ['gemini_reasoning'],
         executionMode,
+        filesCreated: result.filesCreated,
       };
 
       Logger.taskCompleted(task.id, this.agentId, task.title, 'gemini', executionMode, durationMs);

@@ -17,10 +17,13 @@ export const INITIAL_FARHAN_PROFILE: ProfessionalProfile = {
     fullName: 'Md Farhan Hossain',
     professionalName: 'Farhan',
     professionalHeadline: 'Software Developer & AI Builder',
-    email: 'farhanfreak9137@gmail.com',
+    email: 'farhan.sajid1896@gmail.com',
     location: 'Dhaka, Bangladesh',
     portfolioUrl: 'https://portfolio-two-chi-dgvbedq05m.vercel.app/',
     githubUrl: 'https://github.com/farhanfreak9137-ai',
+    linkedInUrl: 'https://www.linkedin.com/in/farhanfreak9137',
+    phone: '+880 1XXXXXXXXX',
+    timezone: 'UTC+6 (Dhaka, Bangladesh)',
     primaryInterests: [
       'AI Engineering',
       'Software Development',
@@ -317,9 +320,58 @@ export const INITIAL_FARHAN_PROFILE: ProfessionalProfile = {
     targetIndustries: ['AI / Machine Learning', 'Developer Tools', 'Software Infrastructure', 'Cloud / Web Systems'],
     targetLocations: ['Remote', 'Dhaka', 'Global Hybrid'],
     remotePreference: 'remote_only',
+    targetRoles: [
+      'Full Stack Engineer',
+      'AI Engineer',
+      'Frontend Developer (React/Next.js)',
+      'AI Integrations Specialist',
+      'Node.js Developer'
+    ],
+    minSalary: '$45,000 - $75,000 / year (or $30 - $50 / hour)',
+    timezoneRequirements: 'Flexible — Can overlap 4+ hours daily with US Eastern, Pacific, and European timezones',
+    dealBreakers: [
+      'No relocation (100% remote only)',
+      'No uncompensated take-home test projects',
+      'No unpaid work'
+    ],
+    submissionStrategy: 'human_in_the_loop',
     visibility: 'APPLICATION_ONLY',
   },
   documents: {
+    masterResumeMarkdown: `# Md Farhan Hossain (Farhan)
+Software Developer & AI Builder
+Email: farhan.sajid1896@gmail.com | Location: Dhaka, Bangladesh
+LinkedIn: https://www.linkedin.com/in/farhanfreak9137 | GitHub: https://github.com/farhanfreak9137-ai
+Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/
+
+---
+### Summary
+Software developer and AI builder with verified project experience in modern web development, multi-agent systems, and AI integration. Active creator of full-stack TypeScript/React tools, agentic workflows, and resilient cloud/web systems.
+
+---
+### Technical Skills
+- **Frontend**: TypeScript, JavaScript, React, Next.js, Vite, Tailwind CSS, KaTeX
+- **Backend & DB**: Node.js, Express, REST APIs, SQLite, Vector Databases
+- **AI & Agentic**: LLM API Integration (Gemini, Claude, OpenAI), RAG Pipelines, Multi-Agent Orchestration, Agent Workflows
+- **Tools & DevOps**: Git, GitHub, Vercel, Netlify, VS Code
+
+---
+### Education
+- **Pallabi Government College** — Higher Secondary Certificate (HSC 2nd Year, Science), Expected 2027
+- **Mdc Model School and College** — Secondary School Certificate (SSC), Completed 2025 (GPA: 4.11)
+
+---
+### Featured Projects
+- **Agent HQ** (Active Project) — Autonomous multi-agent orchestration and operations platform built with TypeScript, React, Node.js, SQLite, Tailwind CSS, and Vite.
+- **Auren** (Active Project) — Windows-focused AI assistant and cognitive OS exploring local AI, tool intent, memory, and voice interaction.
+- **HSC AI Study Intelligence System** (Student Project) — AI-powered study assistance system designed for Bangladesh HSC Science curriculum using React, TypeScript, Gemini, RAG, and KaTeX.
+- **Atlas** (Personal Project) — Productivity application managing tasks, habits, and goals built with Next.js, Netlify, and Android APK target.
+
+---
+### Work Preferences
+- **Role**: Full Stack Engineer, AI Engineer, AI Integrations Specialist, Frontend Developer
+- **Environment**: 100% Remote (Flexible with US/EU timezone overlap)
+- **Strategy**: Human-in-the-loop application approval`,
     resumeVersions: [
       {
         id: 'res_master',
@@ -327,7 +379,7 @@ export const INITIAL_FARHAN_PROFILE: ProfessionalProfile = {
         targetRole: 'Student / Aspiring Software Developer & AI Builder',
         content: `# Md Farhan Hossain (Farhan)
 Software Developer & AI Builder
-Email: farhanfreak9137@gmail.com | Location: Dhaka, Bangladesh
+Email: farhan.sajid1896@gmail.com | Location: Dhaka, Bangladesh
 GitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/
 
 ---
@@ -382,7 +434,7 @@ Student and aspiring software developer with verified personal and student proje
         targetRole: 'Frontend Developer / Web Applications',
         content: `# Md Farhan Hossain (Farhan)
 Frontend Developer & Web Builder
-Email: farhanfreak9137@gmail.com | GitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/
+Email: farhan.sajid1896@gmail.com | GitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/
 
 ---
 ### Profile
@@ -416,7 +468,7 @@ Student and aspiring frontend developer proficient in React, Next.js, TypeScript
         targetRole: 'AI Application & Multi-Agent Builder',
         content: `# Md Farhan Hossain (Farhan)
 AI Application Developer & Multi-Agent Builder
-Email: farhanfreak9137@gmail.com | GitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/
+Email: farhan.sajid1896@gmail.com | GitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/
 
 ---
 ### Profile
@@ -449,7 +501,7 @@ Aspiring developer specializing in practical AI integration, multi-agent systems
         targetRole: 'Software Development / AI Intern',
         content: `# Md Farhan Hossain (Farhan)
 HSC Science Student & Aspiring Software Developer
-Email: farhanfreak9137@gmail.com | Location: Dhaka, Bangladesh
+Email: farhan.sajid1896@gmail.com | Location: Dhaka, Bangladesh
 GitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/
 
 ---
@@ -506,7 +558,14 @@ class ProfileManagerClass {
       if (typeof window !== 'undefined' && window.localStorage) {
         const savedProfile = window.localStorage.getItem(PROFILE_STORAGE_KEY);
         if (savedProfile) {
-          this.profile = JSON.parse(savedProfile);
+          const parsed = JSON.parse(savedProfile);
+          this.profile = {
+            ...INITIAL_FARHAN_PROFILE,
+            ...parsed,
+            identity: { ...INITIAL_FARHAN_PROFILE.identity, ...(parsed.identity || {}) },
+            preferences: { ...INITIAL_FARHAN_PROFILE.preferences, ...(parsed.preferences || {}) },
+            documents: { ...INITIAL_FARHAN_PROFILE.documents, ...(parsed.documents || {}) },
+          };
         }
 
         const savedSuggestions = window.localStorage.getItem(SUGGESTIONS_STORAGE_KEY);

@@ -64,126 +64,175 @@ export function seedDatabase(db: Database.Database): void {
     );
   }
 
-  // 3. Seed Agents if empty
-  const agentCount = db.prepare('SELECT COUNT(*) as count FROM agents').get() as { count: number };
-  if (agentCount.count === 0) {
-    const insertAgent = db.prepare(`
-      INSERT INTO agents (id, name, role, system_directive, provider_id, status, capabilities, assigned_tools, current_room_id, position_x, position_y, stats, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+  // 3. Seed Agents (Ensure all default agents exist)
+  const insertAgent = db.prepare(`
+    INSERT OR IGNORE INTO agents (id, name, role, system_directive, provider_id, status, capabilities, assigned_tools, current_room_id, position_x, position_y, stats, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
 
-    const defaultAgents = [
-      {
-        id: 'boss',
-        name: 'BOSS',
-        role: 'Orchestrator',
-        system_directive: 'Autonomous central orchestrator and hierarchical task planner',
-        provider_id: 'mock',
-        status: 'IDLE',
-        capabilities: ['orchestration'],
-        assigned_tools: ['tool_task_planner'],
-        current_room_id: 'room_command',
-        position_x: 760,
-        position_y: 155,
-      },
-      {
-        id: 'nova',
-        name: 'NOVA',
-        role: 'Coder',
-        system_directive: 'Principal software architect and implementation lead',
-        provider_id: 'antigravity',
-        status: 'IDLE',
-        capabilities: ['coding'],
-        assigned_tools: ['tool_code_analysis'],
-        current_room_id: 'room_coding',
-        position_x: 260,
-        position_y: 160,
-      },
-      {
-        id: 'atlas',
-        name: 'ATLAS',
-        role: 'Researcher',
-        system_directive: 'Lead research scientist and intelligence analyst',
-        provider_id: 'gemini',
-        status: 'IDLE',
-        capabilities: ['research'],
-        assigned_tools: ['tool_search'],
-        current_room_id: 'room_research',
-        position_x: 260,
-        position_y: 820,
-      },
-      {
-        id: 'pixel',
-        name: 'PIXEL',
-        role: 'Designer',
-        system_directive: 'Principal UI/UX architect and creative director',
-        provider_id: 'mock',
-        status: 'IDLE',
-        capabilities: ['design'],
-        assigned_tools: ['tool_design_system'],
-        current_room_id: 'room_design',
-        position_x: 260,
-        position_y: 490,
-      },
-      {
-        id: 'echo',
-        name: 'ECHO',
-        role: 'Reviewer',
-        system_directive: 'Lead code auditor and architectural review authority',
-        provider_id: 'antigravity',
-        status: 'IDLE',
-        capabilities: ['review'],
-        assigned_tools: ['tool_file_inspection'],
-        current_room_id: 'room_review',
-        position_x: 1260,
-        position_y: 820,
-      },
-      {
-        id: 'sentinel',
-        name: 'SENTINEL',
-        role: 'Security',
-        system_directive: 'Chief zero-trust security engineer and cryptographic auditor',
-        provider_id: 'gemini',
-        status: 'IDLE',
-        capabilities: ['security'],
-        assigned_tools: ['tool_security_scanner'],
-        current_room_id: 'room_security',
-        position_x: 1260,
-        position_y: 160,
-      },
-      {
-        id: 'vector',
-        name: 'VECTOR',
-        role: 'Tester',
-        system_directive: 'Automated test engineer and chaos simulation specialist',
-        provider_id: 'mock',
-        status: 'IDLE',
-        capabilities: ['testing'],
-        assigned_tools: ['tool_test_runner'],
-        current_room_id: 'room_testing',
-        position_x: 1260,
-        position_y: 490,
-      },
-    ];
+  const defaultAgents = [
+    {
+      id: 'boss',
+      name: 'BOSS',
+      role: 'Orchestrator',
+      system_directive: 'Autonomous central orchestrator and hierarchical task planner',
+      provider_id: 'mock',
+      status: 'IDLE',
+      capabilities: ['orchestration'],
+      assigned_tools: ['tool_task_planner'],
+      current_room_id: 'room_command',
+      position_x: 760,
+      position_y: 155,
+    },
+    {
+      id: 'nova',
+      name: 'NOVA',
+      role: 'Coder',
+      system_directive: 'Principal software architect and implementation lead',
+      provider_id: 'antigravity',
+      status: 'IDLE',
+      capabilities: ['coding'],
+      assigned_tools: ['tool_code_analysis'],
+      current_room_id: 'room_coding',
+      position_x: 260,
+      position_y: 160,
+    },
+    {
+      id: 'atlas',
+      name: 'ATLAS',
+      role: 'Researcher',
+      system_directive: 'Lead research scientist and intelligence analyst',
+      provider_id: 'gemini',
+      status: 'IDLE',
+      capabilities: ['research'],
+      assigned_tools: ['tool_search'],
+      current_room_id: 'room_research',
+      position_x: 260,
+      position_y: 820,
+    },
+    {
+      id: 'pixel',
+      name: 'PIXEL',
+      role: 'Designer',
+      system_directive: 'Principal UI/UX architect and creative director',
+      provider_id: 'mock',
+      status: 'IDLE',
+      capabilities: ['design'],
+      assigned_tools: ['tool_design_system'],
+      current_room_id: 'room_design',
+      position_x: 260,
+      position_y: 490,
+    },
+    {
+      id: 'echo',
+      name: 'ECHO',
+      role: 'Reviewer',
+      system_directive: 'Lead code auditor and architectural review authority',
+      provider_id: 'antigravity',
+      status: 'IDLE',
+      capabilities: ['review'],
+      assigned_tools: ['tool_file_inspection'],
+      current_room_id: 'room_review',
+      position_x: 1260,
+      position_y: 820,
+    },
+    {
+      id: 'sentinel',
+      name: 'SENTINEL',
+      role: 'Security',
+      system_directive: 'Chief zero-trust security engineer and cryptographic auditor',
+      provider_id: 'gemini',
+      status: 'IDLE',
+      capabilities: ['security'],
+      assigned_tools: ['tool_security_scanner'],
+      current_room_id: 'room_security',
+      position_x: 1260,
+      position_y: 160,
+    },
+    {
+      id: 'vector',
+      name: 'VECTOR',
+      role: 'Tester',
+      system_directive: 'Automated test engineer and chaos simulation specialist',
+      provider_id: 'mock',
+      status: 'IDLE',
+      capabilities: ['testing'],
+      assigned_tools: ['tool_test_runner'],
+      current_room_id: 'room_testing',
+      position_x: 1260,
+      position_y: 490,
+    },
+    {
+      id: 'quill',
+      name: 'QUILL',
+      role: 'Writer',
+      system_directive: 'Lead author, academic researcher, and creative literary specialist',
+      provider_id: 'gemini',
+      status: 'IDLE',
+      capabilities: ['writing', 'research'],
+      assigned_tools: ['tool_document_writer', 'tool_search'],
+      current_room_id: 'room_core',
+      position_x: 760,
+      position_y: 825,
+    },
+    {
+      id: 'strategist',
+      name: 'STRATEGIST',
+      role: 'Strategist',
+      system_directive: 'Lead commercial and technical strategist',
+      provider_id: 'gemini',
+      status: 'IDLE',
+      capabilities: ['strategy', 'research'],
+      assigned_tools: ['tool_opportunity_analyzer', 'tool_service_matcher', 'tool_search'],
+      current_room_id: 'room_command',
+      position_x: 630,
+      position_y: 155,
+    },
+    {
+      id: 'crm',
+      name: 'CRM',
+      role: 'CRM / Operations',
+      system_directive: 'CRM operations director and pipeline lifecycle gatekeeper',
+      provider_id: 'mock',
+      status: 'IDLE',
+      capabilities: ['crm', 'orchestration'],
+      assigned_tools: ['tool_prospect_manager'],
+      current_room_id: 'room_common',
+      position_x: 650,
+      position_y: 490,
+    },
+    {
+      id: 'outreach',
+      name: 'OUTREACH',
+      role: 'Outreach',
+      system_directive: 'Personalized communication specialist and outreach drafter',
+      provider_id: 'gemini',
+      status: 'IDLE',
+      capabilities: ['outreach', 'writing'],
+      assigned_tools: ['tool_outreach_drafter', 'tool_application_drafter'],
+      current_room_id: 'room_common',
+      position_x: 870,
+      position_y: 490,
+    },
+  ];
 
-    for (const a of defaultAgents) {
-      insertAgent.run(
-        a.id,
-        a.name,
-        a.role,
-        a.system_directive,
-        a.provider_id,
-        a.status,
-        JSON.stringify(a.capabilities),
-        JSON.stringify(a.assigned_tools),
-        a.current_room_id,
-        a.position_x,
-        a.position_y,
-        JSON.stringify({ tasksCompleted: 0, tasksInProgress: 0, messagesSent: 0, messagesReceived: 0 }),
-        now,
-        now
-      );
-    }
+  for (const a of defaultAgents) {
+    insertAgent.run(
+      a.id,
+      a.name,
+      a.role,
+      a.system_directive,
+      a.provider_id,
+      a.status,
+      JSON.stringify(a.capabilities),
+      JSON.stringify(a.assigned_tools),
+      a.current_room_id,
+      a.position_x,
+      a.position_y,
+      JSON.stringify({ tasksCompleted: 0, tasksInProgress: 0, messagesSent: 0, messagesReceived: 0 }),
+      now,
+      now
+    );
   }
 
   // 4. Migration & Seed Farhan's Professional Profile if empty
@@ -204,7 +253,7 @@ export function seedDatabase(db: Database.Database): void {
         fullName: 'Md Farhan Hossain',
         professionalName: 'Farhan',
         professionalHeadline: 'Software Developer & AI Builder',
-        email: 'farhanfreak9137@gmail.com',
+        email: 'farhan.sajid1896@gmail.com',
         location: 'Dhaka, Bangladesh',
         portfolioUrl: 'https://portfolio-two-chi-dgvbedq05m.vercel.app/',
         githubUrl: 'https://github.com/farhanfreak9137-ai',
@@ -512,28 +561,28 @@ export function seedDatabase(db: Database.Database): void {
             id: 'res_master',
             name: 'Master Resume',
             targetRole: 'Student / Aspiring Software Developer & AI Builder',
-            content: `# Md Farhan Hossain (Farhan)\nSoftware Developer & AI Builder\nEmail: farhanfreak9137@gmail.com | Location: Dhaka, Bangladesh\nGitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/\n\n---\n### Summary\nStudent and aspiring software developer with verified personal and student project experience in modern web development, multi-agent systems, and AI integration. Active builder of full-stack TypeScript/React tools and AI applications.\n\n---\n### Education\n- **Pallabi Government College** — HSC 2nd Year (Science), Expected 2027\n- **Milestone College** — Higher Secondary Education (Previous College)\n- **Mdc Model School and College** — Secondary School Certificate (SSC), 2025 (GPA: 4.11)\n*(Note: High school student; has not completed university education).*\n\n---\n### Work Experience\n- **Shwapno** — Checkout Assistant / POS Cashier (July 30, 2025 – December 20, 2025)\n  - Operated point-of-sale (POS) terminals and managed retail transactions.\n  - Stepped down to focus on academic improvement.\n\n---\n### Personal & Student Projects\n- **Agent HQ** (Active Project) — Multi-agent orchestration platform.\n- **Auren** (Active Personal Project) — Windows-focused AI assistant / cognitive OS.\n- **HSC AI Study Intelligence System** (Active Student Project) — HSC Science AI study system.\n- **Atlas** (Personal Project) — Productivity application.\n- **Gym Tracker** (Personal Project) — Fitness tracking application.`,
+            content: `# Md Farhan Hossain (Farhan)\nSoftware Developer & AI Builder\nEmail: farhan.sajid1896@gmail.com | Location: Dhaka, Bangladesh\nGitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/\n\n---\n### Summary\nStudent and aspiring software developer with verified personal and student project experience in modern web development, multi-agent systems, and AI integration. Active builder of full-stack TypeScript/React tools and AI applications.\n\n---\n### Education\n- **Pallabi Government College** — HSC 2nd Year (Science), Expected 2027\n- **Milestone College** — Higher Secondary Education (Previous College)\n- **Mdc Model School and College** — Secondary School Certificate (SSC), 2025 (GPA: 4.11)\n*(Note: High school student; has not completed university education).*\n\n---\n### Work Experience\n- **Shwapno** — Checkout Assistant / POS Cashier (July 30, 2025 – December 20, 2025)\n  - Operated point-of-sale (POS) terminals and managed retail transactions.\n  - Stepped down to focus on academic improvement.\n\n---\n### Personal & Student Projects\n- **Agent HQ** (Active Project) — Multi-agent orchestration platform.\n- **Auren** (Active Personal Project) — Windows-focused AI assistant / cognitive OS.\n- **HSC AI Study Intelligence System** (Active Student Project) — HSC Science AI study system.\n- **Atlas** (Personal Project) — Productivity application.\n- **Gym Tracker** (Personal Project) — Fitness tracking application.`,
             updatedAt: now,
           },
           {
             id: 'res_frontend',
             name: 'Frontend Developer Resume',
             targetRole: 'Frontend Developer / Web Applications',
-            content: `# Md Farhan Hossain (Farhan)\nFrontend Developer & Web Builder\nEmail: farhanfreak9137@gmail.com | GitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/\n\n---\n### Profile\nStudent and aspiring frontend developer proficient in React, Next.js, TypeScript, and modern CSS/Tailwind.\n\n---\n### Education\n- **Pallabi Government College** — HSC 2nd Year (Science), Expected 2027\n- **Mdc Model School and College** — SSC, 2025 (GPA: 4.11)\n\n---\n### Work Experience\n- **Shwapno** — Checkout Assistant / POS Cashier (July 30, 2025 – December 20, 2025)\n  - Managed point-of-sale customer checkouts and retail transactions. Stepped down to focus on academic improvement.\n\n---\n### Key Frontend Projects\n- **Agent HQ UI** — Responsive 2D canvas workspace with React, TypeScript, and Tailwind CSS.\n- **Atlas** — Personal productivity application with Next.js and React.\n- **HSC AI Study Interface** — Interactive educational app with KaTeX and Capacitor.\n- **Gym Tracker** — Fitness logging user interface built with React and TypeScript.`,
+            content: `# Md Farhan Hossain (Farhan)\nFrontend Developer & Web Builder\nEmail: farhan.sajid1896@gmail.com | GitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/\n\n---\n### Profile\nStudent and aspiring frontend developer proficient in React, Next.js, TypeScript, and modern CSS/Tailwind.\n\n---\n### Education\n- **Pallabi Government College** — HSC 2nd Year (Science), Expected 2027\n- **Mdc Model School and College** — SSC, 2025 (GPA: 4.11)\n\n---\n### Work Experience\n- **Shwapno** — Checkout Assistant / POS Cashier (July 30, 2025 – December 20, 2025)\n  - Managed point-of-sale customer checkouts and retail transactions. Stepped down to focus on academic improvement.\n\n---\n### Key Frontend Projects\n- **Agent HQ UI** — Responsive 2D canvas workspace with React, TypeScript, and Tailwind CSS.\n- **Atlas** — Personal productivity application with Next.js and React.\n- **HSC AI Study Interface** — Interactive educational app with KaTeX and Capacitor.\n- **Gym Tracker** — Fitness logging user interface built with React and TypeScript.`,
             updatedAt: now,
           },
           {
             id: 'res_ai',
             name: 'AI Developer Resume',
             targetRole: 'AI Application & Multi-Agent Builder',
-            content: `# Md Farhan Hossain (Farhan)\nAI Application Developer & Multi-Agent Builder\nEmail: farhanfreak9137@gmail.com | GitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/\n\n---\n### Profile\nAspiring developer specializing in practical AI integration, multi-agent systems, and generative AI applications.\n\n---\n### Education\n- **Pallabi Government College** — HSC 2nd Year (Science), Expected 2027\n- **Mdc Model School and College** — SSC, 2025 (GPA: 4.11)\n\n---\n### Work Experience\n- **Shwapno** — Checkout Assistant / POS Cashier (July 30, 2025 – December 20, 2025)\n  - Managed point-of-sale customer checkouts and transactions. Stepped down to focus on academic improvement.\n\n---\n### Featured AI Projects\n- **Agent HQ** — Multi-agent orchestration engine with DAG task execution, tool use, and memory.\n- **Auren** — Windows-focused AI assistant exploring local AI inference and cognitive memory.\n- **HSC AI Study Intelligence System** — AI-assisted study workflows with RAG question answering.`,
+            content: `# Md Farhan Hossain (Farhan)\nAI Application Developer & Multi-Agent Builder\nEmail: farhan.sajid1896@gmail.com | GitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/\n\n---\n### Profile\nAspiring developer specializing in practical AI integration, multi-agent systems, and generative AI applications.\n\n---\n### Education\n- **Pallabi Government College** — HSC 2nd Year (Science), Expected 2027\n- **Mdc Model School and College** — SSC, 2025 (GPA: 4.11)\n\n---\n### Work Experience\n- **Shwapno** — Checkout Assistant / POS Cashier (July 30, 2025 – December 20, 2025)\n  - Managed point-of-sale customer checkouts and transactions. Stepped down to focus on academic improvement.\n\n---\n### Featured AI Projects\n- **Agent HQ** — Multi-agent orchestration engine with DAG task execution, tool use, and memory.\n- **Auren** — Windows-focused AI assistant exploring local AI inference and cognitive memory.\n- **HSC AI Study Intelligence System** — AI-assisted study workflows with RAG question answering.`,
             updatedAt: now,
           },
           {
             id: 'res_internship',
             name: 'Student Internship Resume',
             targetRole: 'Software Development / AI Intern',
-            content: `# Md Farhan Hossain (Farhan)\nHSC Science Student & Aspiring Software Developer\nEmail: farhanfreak9137@gmail.com | Location: Dhaka, Bangladesh\nGitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/\n\n---\n### Objective\nEnthusiastic HSC 2nd Year Science student seeking a software development or AI engineering internship to apply practical skills in TypeScript, React, Node.js, and autonomous agent systems.\n\n---\n### Academic Background\n- **Pallabi Government College** — HSC 2nd Year (Science stream), Expected 2027\n- **Milestone College** — Higher Secondary Education\n- **Mdc Model School and College** — SSC, 2025 (GPA: 4.11)\n\n---\n### Work Experience\n- **Shwapno** — Checkout Assistant / POS Cashier (July 30, 2025 – December 20, 2025)\n  - Demonstrated punctuality, cash-handling accuracy, customer service, and team coordination.\n\n---\n### Demonstrated Project Experience\n- **Agent HQ** — Multi-agent operations platform built with TypeScript, React, and Node.js.\n- **HSC AI Study System** — AI-assisted study system using React, TypeScript, and RAG.\n- **Atlas & Gym Tracker** — Personal productivity and utility web applications.`,
+            content: `# Md Farhan Hossain (Farhan)\nHSC Science Student & Aspiring Software Developer\nEmail: farhan.sajid1896@gmail.com | Location: Dhaka, Bangladesh\nGitHub: https://github.com/farhanfreak9137-ai | Portfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/\n\n---\n### Objective\nEnthusiastic HSC 2nd Year Science student seeking a software development or AI engineering internship to apply practical skills in TypeScript, React, Node.js, and autonomous agent systems.\n\n---\n### Academic Background\n- **Pallabi Government College** — HSC 2nd Year (Science stream), Expected 2027\n- **Milestone College** — Higher Secondary Education\n- **Mdc Model School and College** — SSC, 2025 (GPA: 4.11)\n\n---\n### Work Experience\n- **Shwapno** — Checkout Assistant / POS Cashier (July 30, 2025 – December 20, 2025)\n  - Demonstrated punctuality, cash-handling accuracy, customer service, and team coordination.\n\n---\n### Demonstrated Project Experience\n- **Agent HQ** — Multi-agent operations platform built with TypeScript, React, and Node.js.\n- **HSC AI Study System** — AI-assisted study system using React, TypeScript, and RAG.\n- **Atlas & Gym Tracker** — Personal productivity and utility web applications.`,
             updatedAt: now,
           },
         ],
@@ -555,6 +604,52 @@ export function seedDatabase(db: Database.Database): void {
       INSERT INTO professional_profile (id, data, version, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
     `).run('farhan_profile_master', JSON.stringify(defaultProfile), 1, now, now);
+  } else {
+    // Ensure existing profile in DB has all extended job preference fields
+    try {
+      const existingRow = db.prepare('SELECT * FROM professional_profile LIMIT 1').get() as any;
+      if (existingRow && existingRow.data) {
+        const parsed = JSON.parse(existingRow.data);
+        let changed = false;
+        if (!parsed.identity.linkedInUrl) {
+          parsed.identity.linkedInUrl = 'https://www.linkedin.com/in/farhanfreak9137';
+          parsed.identity.phone = '+880 1XXXXXXXXX';
+          parsed.identity.timezone = 'UTC+6 (Dhaka, Bangladesh)';
+          changed = true;
+        }
+        if (!parsed.preferences.targetRoles || parsed.preferences.targetRoles.length === 0) {
+          parsed.preferences.targetRoles = [
+            'Full Stack Engineer',
+            'AI Engineer',
+            'Frontend Developer (React/Next.js)',
+            'AI Integrations Specialist',
+            'Node.js Developer',
+          ];
+          parsed.preferences.minSalary = '$45,000 - $75,000 / year (or $30 - $50 / hour)';
+          parsed.preferences.timezoneRequirements =
+            'Flexible — Can overlap 4+ hours daily with US Eastern, Pacific, and European timezones';
+          parsed.preferences.dealBreakers = [
+            'No relocation (100% remote only)',
+            'No uncompensated take-home test projects',
+            'No unpaid work',
+          ];
+          parsed.preferences.submissionStrategy = 'human_in_the_loop';
+          changed = true;
+        }
+        if (!parsed.documents.masterResumeMarkdown) {
+          const resMaster = parsed.documents?.resumeVersions?.find((r: any) => r.id === 'res_master');
+          parsed.documents.masterResumeMarkdown = resMaster ? resMaster.content : `# Md Farhan Hossain (Farhan)\nSoftware Developer & AI Builder\nEmail: farhan.sajid1896@gmail.com | Location: Dhaka, Bangladesh\nLinkedIn: https://www.linkedin.com/in/farhanfreak9137 | GitHub: https://github.com/farhanfreak9137-ai\nPortfolio: https://portfolio-two-chi-dgvbedq05m.vercel.app/`;
+          changed = true;
+        }
+        if (changed) {
+          db.prepare('UPDATE professional_profile SET data = ?, updated_at = ? WHERE id = ?').run(
+            JSON.stringify(parsed),
+            now,
+            existingRow.id
+          );
+        }
+      }
+    } catch {}
   }
 
   // 5. Seed Initial Real Opportunities if empty
@@ -674,6 +769,24 @@ export function seedDatabase(db: Database.Database): void {
       now
     );
   }
+
+  // 6. Seed Default Email Integration Config if empty
+  const emailConfigCount = db.prepare('SELECT COUNT(*) as count FROM email_integration_config').get() as { count: number };
+  if (emailConfigCount.count === 0) {
+    db.prepare(`
+      INSERT OR IGNORE INTO email_integration_config (id, gmail_address, app_password, sender_name, stagger_delay_seconds, auto_send_enabled, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('gmail_master', 'farhan.sajid1896@gmail.com', '', 'Md Farhan Hossain', 20, 0, now);
+  }
+
+  // 7. Seed Default Notification Settings if empty
+  const notifCount = db.prepare('SELECT COUNT(*) as count FROM notification_settings').get() as { count: number };
+  if (notifCount.count === 0) {
+    db.prepare(`
+      INSERT OR IGNORE INTO notification_settings (id, channel, discord_webhook_url, is_enabled, poll_interval_minutes, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run('notifications_master', 'discord', '', 1, 5, now);
+  }
 }
 
 /**
@@ -689,10 +802,15 @@ export function resetDatabase(db: Database.Database): void {
     DELETE FROM task_dependencies;
     DELETE FROM tasks;
     DELETE FROM missions;
+    DELETE FROM incoming_replies;
+    DELETE FROM notification_settings;
+    DELETE FROM outreach_emails;
+    DELETE FROM email_integration_config;
     DELETE FROM outreach_drafts;
     DELETE FROM prospects;
     DELETE FROM job_applications;
     DELETE FROM opportunities;
+
     DELETE FROM profile_suggestions;
     DELETE FROM professional_profile;
     DELETE FROM agents;
@@ -701,6 +819,7 @@ export function resetDatabase(db: Database.Database): void {
   `);
   seedDatabase(db);
 }
+
 
 
 /**

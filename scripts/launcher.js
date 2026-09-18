@@ -45,7 +45,7 @@ console.log('\n[1/3] Starting Agent HQ Backend Server (Port 3001)...');
 const isWin = process.platform === 'win32';
 const npxCmd = isWin ? 'npx.cmd' : 'npx';
 
-const backendProcess = spawn(npxCmd, ['tsx', 'server/index.ts'], {
+const backendProcess = spawn(npxCmd, ['tsx', 'watch', 'server/index.ts'], {
   cwd: rootDir,
   shell: isWin,
   stdio: 'inherit',

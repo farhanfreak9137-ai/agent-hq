@@ -286,6 +286,61 @@ CREATE TABLE IF NOT EXISTS job_applications (
   FOREIGN KEY (opportunity_id) REFERENCES opportunities(id) ON DELETE CASCADE
 );
 
+-- 19. Gmail Integration & SMTP Config
+CREATE TABLE IF NOT EXISTS email_integration_config (
+  id TEXT PRIMARY KEY,
+  gmail_address TEXT NOT NULL,
+  app_password TEXT NOT NULL,
+  sender_name TEXT NOT NULL DEFAULT 'Md Farhan Hossain',
+  stagger_delay_seconds INTEGER NOT NULL DEFAULT 20,
+  auto_send_enabled INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL
+);
+
+-- 20. Staged & Dispatched Outreach Emails
+CREATE TABLE IF NOT EXISTS outreach_emails (
+  id TEXT PRIMARY KEY,
+  company TEXT NOT NULL,
+  role TEXT NOT NULL,
+  recipient_email TEXT NOT NULL,
+  recipient_name TEXT,
+  subject TEXT NOT NULL,
+  body_html TEXT NOT NULL,
+  body_text TEXT NOT NULL,
+  attachments TEXT, -- JSON array of file paths
+  status TEXT NOT NULL DEFAULT 'staged' CHECK(status IN ('staged', 'sending', 'sent', 'failed')),
+  error_message TEXT,
+  sent_at INTEGER,
+  created_at INTEGER NOT NULL
+);
+
+-- 21. Recruiter & Company Incoming Replies
+CREATE TABLE IF NOT EXISTS incoming_replies (
+  id TEXT PRIMARY KEY,
+  outreach_email_id TEXT,
+  from_email TEXT NOT NULL,
+  from_name TEXT,
+  company TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  body_text TEXT NOT NULL,
+  body_html TEXT,
+  intent TEXT NOT NULL DEFAULT 'general' CHECK(intent IN ('interview_invite', 'question', 'rejection', 'general')),
+  drafted_reply TEXT,
+  status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new', 'staged', 'replied', 'archived')),
+  received_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+-- 22. Mobile & Webhook Notification Settings
+CREATE TABLE IF NOT EXISTS notification_settings (
+  id TEXT PRIMARY KEY,
+  channel TEXT NOT NULL DEFAULT 'discord' CHECK(channel IN ('discord', 'none')),
+  discord_webhook_url TEXT NOT NULL DEFAULT '',
+  is_enabled INTEGER NOT NULL DEFAULT 1,
+  poll_interval_minutes INTEGER NOT NULL DEFAULT 5,
+  updated_at INTEGER NOT NULL
+);
+
 -- INDEXES for fast operational queries
 CREATE INDEX IF NOT EXISTS idx_tasks_mission_id ON tasks(mission_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned_agent ON tasks(assigned_agent_id);
@@ -312,5 +367,11 @@ CREATE INDEX IF NOT EXISTS idx_opportunities_org ON opportunities(organization);
 CREATE INDEX IF NOT EXISTS idx_opportunities_type ON opportunities(type);
 CREATE INDEX IF NOT EXISTS idx_job_apps_opp ON job_applications(opportunity_id);
 CREATE INDEX IF NOT EXISTS idx_job_apps_status ON job_applications(status);
+CREATE INDEX IF NOT EXISTS idx_outreach_emails_status ON outreach_emails(status);
+CREATE INDEX IF NOT EXISTS idx_outreach_emails_created ON outreach_emails(created_at);
+CREATE INDEX IF NOT EXISTS idx_incoming_replies_status ON incoming_replies(status);
+CREATE INDEX IF NOT EXISTS idx_incoming_replies_intent ON incoming_replies(intent);
+CREATE INDEX IF NOT EXISTS idx_incoming_replies_time ON incoming_replies(received_at);
 `;
+
 
